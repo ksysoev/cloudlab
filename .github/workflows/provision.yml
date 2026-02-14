@@ -33,9 +33,6 @@ jobs:
     
     # Always use production environment for main branch operations
     environment: production
-
-    env:
-      TF_CLOUD_ORGANIZATION: ${{ secrets.TF_CLOUD_ORG }}
     
     defaults:
       run:
@@ -64,43 +61,23 @@ jobs:
         id: validate
         run: terraform validate -no-color
 
+      # Note: All TF_VAR_* variables are configured directly in the HCP Terraform
+      # workspace as Terraform variables. Environment variables set here do NOT
+      # reach the remote execution runner.
+
       - name: Terraform Plan
         id: plan
         if: github.event.inputs.action == 'plan'
         run: terraform plan -no-color -input=false
-        env:
-          TF_VAR_do_token: ${{ secrets.DO_TOKEN }}
-          TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
-          TF_VAR_grafana_cloud_logs_url: ${{ secrets.GRAFANA_CLOUD_LOGS_URL }}
-          TF_VAR_grafana_cloud_logs_id: ${{ secrets.GRAFANA_CLOUD_LOGS_ID }}
-          TF_VAR_grafana_cloud_metrics_url: ${{ secrets.GRAFANA_CLOUD_METRICS_URL }}
-          TF_VAR_grafana_cloud_metrics_id: ${{ secrets.GRAFANA_CLOUD_METRICS_ID }}
-          TF_VAR_grafana_cloud_api_key: ${{ secrets.GRAFANA_CLOUD_API_KEY }}
 
       - name: Terraform Apply
         id: apply
         if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event.inputs.action == 'apply'
         run: terraform apply -auto-approve -input=false
-        env:
-          TF_VAR_do_token: ${{ secrets.DO_TOKEN }}
-          TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
-          TF_VAR_grafana_cloud_logs_url: ${{ secrets.GRAFANA_CLOUD_LOGS_URL }}
-          TF_VAR_grafana_cloud_logs_id: ${{ secrets.GRAFANA_CLOUD_LOGS_ID }}
-          TF_VAR_grafana_cloud_metrics_url: ${{ secrets.GRAFANA_CLOUD_METRICS_URL }}
-          TF_VAR_grafana_cloud_metrics_id: ${{ secrets.GRAFANA_CLOUD_METRICS_ID }}
-          TF_VAR_grafana_cloud_api_key: ${{ secrets.GRAFANA_CLOUD_API_KEY }}
 
       - name: Terraform Destroy
         if: github.event.inputs.action == 'destroy' && github.ref == 'refs/heads/main'
         run: terraform destroy -auto-approve -input=false
-        env:
-          TF_VAR_do_token: ${{ secrets.DO_TOKEN }}
-          TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
-          TF_VAR_grafana_cloud_logs_url: ${{ secrets.GRAFANA_CLOUD_LOGS_URL }}
-          TF_VAR_grafana_cloud_logs_id: ${{ secrets.GRAFANA_CLOUD_LOGS_ID }}
-          TF_VAR_grafana_cloud_metrics_url: ${{ secrets.GRAFANA_CLOUD_METRICS_URL }}
-          TF_VAR_grafana_cloud_metrics_id: ${{ secrets.GRAFANA_CLOUD_METRICS_ID }}
-          TF_VAR_grafana_cloud_api_key: ${{ secrets.GRAFANA_CLOUD_API_KEY }}
 
       - name: Terraform Format Status
         if: steps.fmt.outcome == 'failure'

@@ -9,8 +9,8 @@ terraform {
   }
 
   # Terraform Cloud backend configuration
-  # Organization is set via TF_CLOUD_ORGANIZATION environment variable
   cloud {
+    organization = "PetVerse"
     workspaces {
       name = "cloudlab-infrastructure"
     }

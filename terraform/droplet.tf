@@ -1,25 +1,9 @@
-# Data source to get the latest Ubuntu 24.04 LTS image
-data "digitalocean_images" "ubuntu" {
-  filter {
-    key    = "distribution"
-    values = ["Ubuntu"]
-  }
-  filter {
-    key    = "name"
-    values = ["24.04"]
-  }
-  sort {
-    key       = "created"
-    direction = "desc"
-  }
-}
-
 # Main Swarm manager droplet
 resource "digitalocean_droplet" "swarm_manager" {
   name   = var.droplet_name
   region = var.do_region
   size   = var.droplet_size
-  image  = data.digitalocean_images.ubuntu.images[0].slug
+  image  = "ubuntu-24-04-x64"
 
   ssh_keys = [digitalocean_ssh_key.cloudlab.id]
 
