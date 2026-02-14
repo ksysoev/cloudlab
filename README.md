@@ -30,7 +30,16 @@ git clone https://github.com/YOUR_USERNAME/cloudlab.git
 cd cloudlab
 ```
 
-### 2. Set up infrastructure
+### 2. Configure GitHub Secrets
+
+This repository needs two secrets for GitHub Actions to work:
+
+1. Go to **Settings → Secrets and variables → Actions**
+2. Add these repository secrets:
+   - `TF_API_TOKEN` - Your Terraform Cloud API token
+   - `DO_TOKEN` - Your DigitalOcean API token
+
+### 3. Set up infrastructure
 
 Follow the [Setup Guide](docs/SETUP.md) to:
 - Configure Terraform Cloud
@@ -47,7 +56,7 @@ terraform init
 terraform apply
 ```
 
-### 3. Deploy your first project
+### 4. Deploy your first project
 
 Add this workflow to your project's `.github/workflows/deploy.yml`:
 
@@ -76,7 +85,9 @@ See the [Deployment Guide](docs/DEPLOYMENT.md) for details.
 
 - **[Setup Guide](docs/SETUP.md)** - Initial infrastructure setup
 - **[Deployment Guide](docs/DEPLOYMENT.md)** - How to deploy projects
+- **[Security Guide](docs/SECURITY.md)** - Security configuration and best practices
 - **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Common issues and solutions
+- **[Quick Reference](docs/QUICK_REFERENCE.md)** - Command cheat sheet
 
 ## Architecture
 
@@ -154,7 +165,7 @@ cloudlab/
 
 - **Cloud Provider:** DigitalOcean
 - **IaC Tool:** Terraform with Terraform Cloud backend
-- **OS:** Ubuntu 22.04 LTS
+- **OS:** Ubuntu 24.04 LTS
 - **Container Orchestration:** Docker Swarm
 - **CI/CD:** GitHub Actions
 - **Container Registry:** GitHub Container Registry (GHCR)
