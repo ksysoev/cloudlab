@@ -25,7 +25,7 @@ resource "digitalocean_droplet" "swarm_manager" {
 
   # User data for initial setup
   user_data = templatefile("${path.module}/cloud-init.yaml", {
-    deployer_ssh_key          = var.deployer_ssh_public_key != "" ? var.deployer_ssh_public_key : file(pathexpand(var.ssh_public_key_path))
+    deployer_ssh_key          = var.deployer_ssh_public_key != "" ? var.deployer_ssh_public_key : var.ssh_public_key
     ssh_port                  = var.ssh_port
     grafana_cloud_logs_url    = var.grafana_cloud_logs_url
     grafana_cloud_logs_id     = var.grafana_cloud_logs_id
@@ -48,27 +48,3 @@ resource "digitalocean_droplet" "swarm_manager" {
   }
 }
 
-# Wait for the droplet to be fully initialized
-resource "null_resource" "wait_for_cloud_init" {
-  depends_on = [digitalocean_droplet.swarm_manager]
-
-  provisioner "remote-exec" {
-    inline = [
-      "echo 'Waiting for cloud-init to complete...'",
-      "cloud-init status --wait",
-      "echo 'Cloud-init completed, verifying Docker installation...'",
-      "docker info",
-    ]
-
-    connection {
-      type        = "ssh"
-      user        = "root"
-      host        = digitalocean_droplet.swarm_manager.ipv4_address
-      port        = var.ssh_port
-      private_key = file(pathexpand(var.ssh_private_key_path))
-      timeout     = "10m"
-      # Add retry logic for SSH port change during cloud-init
-      agent = false
-    }
-  }
-}
