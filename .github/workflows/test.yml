@@ -7,11 +7,6 @@ on:
     paths:
       - 'terraform/**'
       - '.github/workflows/test.yml'
-  push:
-    branches-ignore:
-      - main
-    paths:
-      - 'terraform/**'
 
 permissions:
   contents: read
