@@ -1,2 +1,313 @@
-# cloudlab
-Infrastructure as Code for pet project services deployments 
+# CloudLab
+
+Infrastructure as Code for provisioning Docker Swarm on DigitalOcean.
+
+## Overview
+
+CloudLab provides Terraform configuration for provisioning a secure, production-ready Docker Swarm cluster on DigitalOcean. It includes:
+
+- **Terraform** configuration for infrastructure provisioning
+- **Docker Swarm** single-node cluster (easily scalable)
+- **Grafana Alloy** for logs and metrics collection
+- **Security hardening** with firewall, SSH configuration, and best practices
+- **Complete documentation** for setup and usage
+
+## Features
+
+- **Cost-effective:** ~$12/month for a production-ready swarm cluster
+- **Production-ready:** Hardened security configuration out of the box
+- **Infrastructure as Code:** Reproducible, version-controlled infrastructure
+- **Monitoring:** Built-in Grafana Alloy for observability
+- **Scalable:** Start with one node, scale to multi-node cluster
+- **Secure:** Non-standard SSH port, firewall rules, key authentication
+
+## Quick Start
+
+### 1. Clone this repository
+
+```bash
+git clone https://github.com/YOUR_USERNAME/cloudlab.git
+cd cloudlab
+```
+
+### 2. Configure GitHub Secrets
+
+This repository needs two secrets for GitHub Actions to work:
+
+1. Go to **Settings → Secrets and variables → Actions**
+2. Add these repository secrets:
+   - `TF_API_TOKEN` - Your Terraform Cloud API token
+   - `DO_TOKEN` - Your DigitalOcean API token
+
+### 3. Set up infrastructure
+
+Follow the [Setup Guide](docs/SETUP.md) to:
+- Configure Terraform Cloud
+- Set up DigitalOcean API token
+- Provision the droplet
+
+Quick setup:
+
+```bash
+cd terraform
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars with your values
+terraform init
+terraform apply
+```
+
+### 3. Verify the deployment
+
+After Terraform completes, test SSH access:
+
+```bash
+# Get the droplet IP from outputs
+terraform output droplet_ip
+
+# Connect to the droplet
+ssh -p 1923 root@<droplet-ip>
+
+# Verify Docker Swarm
+docker node ls
+docker service ls
+```
+
+Your infrastructure is now ready! Deploy workloads using `docker stack deploy` or integrate with your CI/CD pipeline.
+
+## Documentation
+
+- **[Setup Guide](docs/SETUP.md)** - Initial infrastructure setup
+- **[Security Guide](docs/SECURITY.md)** - Security configuration and best practices
+- **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Common issues and solutions
+- **[Quick Reference](docs/QUICK_REFERENCE.md)** - Command cheat sheet
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     DigitalOcean Droplet                    │
+│                                                             │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │              Docker Swarm Manager                    │  │
+│  │                                                      │  │
+│  │  ┌────────────┐  ┌────────────┐  ┌────────────┐   │  │
+│  │  │  Project A │  │  Project B │  │  Project C │   │  │
+│  │  │   Stack    │  │   Stack    │  │   Stack    │   │  │
+│  │  └────────────┘  └────────────┘  └────────────┘   │  │
+│  │                                                      │  │
+│  │  ┌────────────────────────────────────────────┐   │  │
+│  │  │         Grafana Alloy (Monitoring)         │   │  │
+│  │  └────────────────────────────────────────────┘   │  │
+│  │                                                      │  │
+│  └──────────────────────────────────────────────────────┘  │
+│                                                             │
+│  Firewall: SSH (1923), HTTP (80), HTTPS (443), Custom (8081)  │
+└─────────────────────────────────────────────────────────────┘
+                           │
+                           │ Terraform
+                           ▼
+              ┌────────────────────────┐
+              │   Infrastructure Setup │
+              │    (Provisioning)      │
+              └────────────────────────┘
+```
+
+## Repository Structure
+
+```
+cloudlab/
+├── terraform/              # Infrastructure as Code
+│   ├── providers.tf        # Terraform & provider config
+│   ├── variables.tf        # Input variables
+│   ├── outputs.tf          # Output values
+│   ├── droplet.tf          # Droplet resource
+│   ├── firewall.tf         # Firewall rules
+│   ├── ssh.tf              # SSH key management
+│   ├── main.tf             # Main configuration
+│   ├── cloud-init.yaml     # Droplet initialization script
+│   └── terraform.tfvars.example
+│
+├── scripts/                # Helper scripts
+│   ├── init-swarm.sh       # Initialize Docker Swarm
+│   └── deploy-alloy.sh     # Deploy Grafana Alloy
+│
+├── alloy/                  # Grafana Alloy configuration
+│   ├── docker-compose.yml  # Alloy service definition
+│   └── config.alloy        # Alloy configuration
+│
+├── .github/workflows/      # GitHub Actions workflows
+│   └── provision.yml       # Infrastructure provisioning
+│
+└── docs/                   # Documentation
+    ├── SETUP.md            # Setup guide
+    ├── SECURITY.md         # Security guide
+    ├── TROUBLESHOOTING.md  # Troubleshooting guide
+    ├── QUICK_REFERENCE.md  # Command cheat sheet
+    └── PRE_MERGE_CHECKLIST.md  # Pre-deployment checklist
+```
+
+## Requirements
+
+- **DigitalOcean Account** - [Sign up](https://www.digitalocean.com/)
+- **Terraform Cloud Account** - [Sign up](https://app.terraform.io/)
+- **GitHub Account** - For hosting code and CI/CD
+- **Terraform CLI** (>= 1.0) - [Install](https://developer.hashicorp.com/terraform/install)
+- **SSH Keys** - For accessing the droplet
+
+## Technology Stack
+
+- **Cloud Provider:** DigitalOcean
+- **IaC Tool:** Terraform with Terraform Cloud backend
+- **OS:** Ubuntu 24.04 LTS
+- **Container Orchestration:** Docker Swarm
+- **CI/CD:** GitHub Actions
+- **Container Registry:** GitHub Container Registry (GHCR)
+- **Monitoring:** Grafana Alloy → Grafana Cloud
+- **Automation:** Cloud-init, Bash scripts
+
+## Cost Breakdown
+
+- **Droplet (s-1vcpu-2gb):** $12/month
+- **Terraform Cloud:** Free tier
+- **GitHub Actions:** Free tier (2000 minutes/month)
+- **Grafana Cloud:** Free tier (14-day retention)
+- **DigitalOcean Bandwidth:** 2TB included
+
+**Total: ~$12/month**
+
+## Use Cases
+
+Perfect for:
+- Personal projects and portfolios
+- Side projects and MVPs
+- Learning and experimentation
+- Development and staging environments
+- Small production workloads
+- Microservices architecture practice
+
+## Scaling Options
+
+### Vertical Scaling (Bigger Droplet)
+
+```bash
+# Edit terraform.tfvars
+droplet_size = "s-2vcpu-4gb"  # $24/mo
+
+# Apply changes
+terraform apply
+```
+
+### Horizontal Scaling (More Nodes)
+
+1. Add worker nodes to `terraform/droplet.tf`
+2. Join workers to the swarm
+3. Scale services across multiple nodes
+
+### Add More Services
+
+Deploy additional services to your swarm:
+- Each service gets its own Docker stack
+- Isolated networks for security
+- Independent scaling per service
+- Easy rollbacks with `docker stack` commands
+
+Deploy manually via SSH:
+```bash
+ssh -p 1923 deployer@<droplet-ip>
+docker stack deploy -c docker-compose.yml my-app
+```
+
+Or integrate with your preferred CI/CD pipeline.
+
+## Security
+
+- **Non-Standard SSH Port:** SSH runs on port 1923 (not 22)
+- **SSH Key Authentication:** No password authentication
+- **Firewall:** Only ports 1923, 80, 443, 8081 (TCP) and 443 (UDP) exposed
+- **Ubuntu 24.04 LTS:** Latest LTS release with automatic security updates
+- **Secrets Management:** GitHub Secrets + Docker Secrets
+- **Fail2ban:** Protection against brute-force attacks
+- **UFW Firewall:** Host-based firewall for defense in depth
+
+See [SECURITY.md](docs/SECURITY.md) for detailed security information.
+
+## Monitoring
+
+- **Grafana Alloy** collects logs and metrics
+- Sends to **Grafana Cloud** (or local Prometheus/Loki)
+- Monitor all services from one dashboard
+- Set up alerts for issues
+
+## Contributing
+
+This is a personal infrastructure project, but feel free to:
+- Fork for your own use
+- Submit issues for bugs
+- Suggest improvements via PRs
+
+## Troubleshooting
+
+Common issues and solutions are documented in [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
+
+Quick tips:
+- **Can't SSH?** Check firewall rules and SSH keys
+- **Terraform fails?** Verify API tokens and Terraform Cloud setup
+- **Service won't start?** Check logs with `docker service logs`
+- **Out of space?** Run `docker system prune -a`
+
+## License
+
+MIT License - See [LICENSE](LICENSE) file
+
+## Roadmap
+
+Future enhancements:
+- [ ] Deployment workflows and CI/CD integration examples
+- [ ] Traefik for automatic SSL and routing
+- [ ] Automated backups to DigitalOcean Spaces
+- [ ] Multi-region support
+- [ ] Database templates (Postgres, Redis, MongoDB)
+- [ ] Terraform modules for different node sizes
+- [ ] Staging environment support
+
+## FAQ
+
+**Q: Can I use this in production?**  
+A: Yes, but consider redundancy, backups, and monitoring for production workloads.
+
+**Q: How many projects can I host?**  
+A: Depends on resource usage. A $12/mo droplet can handle 5-10 lightweight services.
+
+**Q: Can I use other cloud providers?**  
+A: Yes, but you'll need to adapt the Terraform configuration.
+
+**Q: Do I need to know Docker Swarm?**  
+A: Basic knowledge helps, but the guides cover everything you need.
+
+**Q: Can I use Kubernetes instead?**  
+A: This project uses Docker Swarm for simplicity. For K8s, consider managed services like DOKS.
+
+**Q: How do I add SSL certificates?**  
+A: Each project can handle SSL independently, or add Traefik to the swarm for automatic SSL.
+
+## Support
+
+- **Issues:** [GitHub Issues](https://github.com/YOUR_USERNAME/cloudlab/issues)
+- **Documentation:** [docs/](docs/)
+- **Docker Swarm:** [Official Docs](https://docs.docker.com/engine/swarm/)
+- **DigitalOcean:** [Community Tutorials](https://www.digitalocean.com/community/tutorials)
+
+## Acknowledgments
+
+Built with:
+- [Terraform](https://www.terraform.io/)
+- [Docker Swarm](https://docs.docker.com/engine/swarm/)
+- [DigitalOcean](https://www.digitalocean.com/)
+- [Grafana Alloy](https://grafana.com/docs/alloy/)
+- [GitHub Actions](https://github.com/features/actions)
+
+---
+
+**Happy Deploying!** 🚀
+
+For detailed setup instructions, see [docs/SETUP.md](docs/SETUP.md).

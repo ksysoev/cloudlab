@@ -1,0 +1,55 @@
+name: Test Infrastructure
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'terraform/**'
+      - '.github/workflows/test.yml'
+
+permissions:
+  contents: read
+
+env:
+  TF_VERSION: '1.9.0'
+  TF_WORKING_DIR: './terraform'
+  TFC_CLOUD_ORGANIZATION: ${{ secrets.TF_CLOUD_ORG }}
+
+jobs:
+  terraform-validate:
+    name: Terraform Validation
+    runs-on: ubuntu-latest
+    
+    defaults:
+      run:
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+
+      - name: Terraform Format Check
+        id: fmt
+        run: terraform fmt -check -recursive
+        continue-on-error: true
+
+      - name: Terraform Init
+        id: init
+        run: terraform init -backend=false
+
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate -no-color
+
+      - name: Terraform Format Status
+        if: steps.fmt.outcome == 'failure'
+        run: |
+          echo "Terraform formatting check failed. Run 'terraform fmt -recursive' to fix."
+          exit 1
