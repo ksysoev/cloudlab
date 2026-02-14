@@ -150,10 +150,16 @@ write_files:
         echo "Docker Swarm already initialized"
       fi
 
-      # Deploy Grafana Alloy
-      echo "Deploying Grafana Alloy..."
-      cd /opt/cloudlab/alloy
-      docker stack deploy -c docker-compose.yml monitoring || echo "Alloy deployment skipped (might need manual configuration)"
+      # Deploy Grafana Alloy only if endpoint is configured
+      if [ -n "${grafana_cloud_endpoint}" ]; then
+        echo "Deploying Grafana Alloy..."
+        cd /opt/cloudlab/alloy
+        docker stack deploy -c docker-compose.yml monitoring || echo "Alloy deployment failed (please check configuration)"
+      else
+        echo "Grafana Cloud endpoint not configured; skipping Grafana Alloy deployment."
+        echo "To deploy Alloy later, configure your endpoints and run:"
+        echo "  cd /opt/cloudlab/alloy && docker stack deploy -c docker-compose.yml monitoring"
+      fi
 
       echo "Swarm initialization complete!"
       echo "Manager join token:"
@@ -182,9 +188,8 @@ runcmd:
   - systemctl start fail2ban
 
   # Change SSH port to ${ssh_port}
-  - sed -i 's/#Port 22/Port ${ssh_port}/' /etc/ssh/sshd_config
-  - sed -i 's/^Port 22/Port ${ssh_port}/' /etc/ssh/sshd_config
-  - echo "Port ${ssh_port}" >> /etc/ssh/sshd_config.d/custom_port.conf
+  - mkdir -p /etc/ssh/sshd_config.d
+  - echo "Port ${ssh_port}" > /etc/ssh/sshd_config.d/custom_port.conf
   
   # Restart SSH service
   - systemctl restart sshd

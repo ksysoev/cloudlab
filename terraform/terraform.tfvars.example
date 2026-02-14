@@ -26,8 +26,8 @@ droplet_name = "cloudlab-swarm"
 
 # SSH keys for accessing the droplet
 # Generate with: ssh-keygen -t ed25519 -C "your_email@example.com"
-ssh_public_key_path  = "~/.ssh/id_rsa.pub"
-ssh_private_key_path = "~/.ssh/id_rsa"
+ssh_public_key_path  = "~/.ssh/id_ed25519.pub"
+ssh_private_key_path = "~/.ssh/id_ed25519"
 
 # SSH public key for the deployer user (used by GitHub Actions)
 # If not provided, will use the same key as ssh_public_key_path
