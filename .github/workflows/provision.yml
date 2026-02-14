@@ -70,6 +70,7 @@ jobs:
         run: terraform plan -no-color -input=false
         env:
           TF_VAR_do_token: ${{ secrets.DO_TOKEN }}
+          TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
           TF_VAR_grafana_cloud_logs_url: ${{ secrets.GRAFANA_CLOUD_LOGS_URL }}
           TF_VAR_grafana_cloud_logs_id: ${{ secrets.GRAFANA_CLOUD_LOGS_ID }}
           TF_VAR_grafana_cloud_metrics_url: ${{ secrets.GRAFANA_CLOUD_METRICS_URL }}
@@ -82,6 +83,7 @@ jobs:
         run: terraform apply -auto-approve -input=false
         env:
           TF_VAR_do_token: ${{ secrets.DO_TOKEN }}
+          TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
           TF_VAR_grafana_cloud_logs_url: ${{ secrets.GRAFANA_CLOUD_LOGS_URL }}
           TF_VAR_grafana_cloud_logs_id: ${{ secrets.GRAFANA_CLOUD_LOGS_ID }}
           TF_VAR_grafana_cloud_metrics_url: ${{ secrets.GRAFANA_CLOUD_METRICS_URL }}
@@ -93,6 +95,7 @@ jobs:
         run: terraform destroy -auto-approve -input=false
         env:
           TF_VAR_do_token: ${{ secrets.DO_TOKEN }}
+          TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
           TF_VAR_grafana_cloud_logs_url: ${{ secrets.GRAFANA_CLOUD_LOGS_URL }}
           TF_VAR_grafana_cloud_logs_id: ${{ secrets.GRAFANA_CLOUD_LOGS_ID }}
           TF_VAR_grafana_cloud_metrics_url: ${{ secrets.GRAFANA_CLOUD_METRICS_URL }}

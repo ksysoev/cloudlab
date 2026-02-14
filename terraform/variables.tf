@@ -28,16 +28,9 @@ variable "droplet_name" {
   default     = "cloudlab-swarm"
 }
 
-variable "ssh_public_key_path" {
-  description = "Path to SSH public key for droplet access"
+variable "ssh_public_key" {
+  description = "SSH public key content for droplet access"
   type        = string
-  default     = "~/.ssh/id_ed25519.pub"
-}
-
-variable "ssh_private_key_path" {
-  description = "Path to SSH private key for provisioning"
-  type        = string
-  default     = "~/.ssh/id_ed25519"
 }
 
 variable "deployer_ssh_public_key" {
