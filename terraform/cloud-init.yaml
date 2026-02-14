@@ -15,10 +15,10 @@ packages:
   - ufw
   - jq
 
-# Create the deployer user for GitHub Actions deployments
+# Preserve default root user and create the deployer user for GitHub Actions deployments
 users:
+  - default
   - name: deployer
-    groups: docker
     sudo: ['ALL=(ALL) NOPASSWD:ALL']
     shell: /bin/bash
     ssh_authorized_keys:
@@ -26,7 +26,7 @@ users:
 
 # Write configuration files
 write_files:
-  # Docker daemon configuration
+  # Docker daemon configuration (directory created in runcmd before Docker install)
   - path: /etc/docker/daemon.json
     permissions: '0644'
     content: |
@@ -39,6 +39,18 @@ write_files:
         "metrics-addr": "127.0.0.1:9323",
         "experimental": false
       }
+
+  # Fail2ban SSH jail configuration for custom port
+  - path: /etc/fail2ban/jail.local
+    permissions: '0644'
+    content: |
+      [sshd]
+      enabled = true
+      port = ${ssh_port}
+      filter = sshd
+      logpath = /var/log/auth.log
+      maxretry = 5
+      bantime = 3600
 
   # Grafana Alloy configuration template
   - path: /tmp/alloy-config.alloy
@@ -171,32 +183,27 @@ write_files:
       docker swarm join-token worker
 
 runcmd:
+  # Create /etc/docker before Docker install so daemon.json (from write_files) is preserved
+  - mkdir -p /etc/docker
+
   # Install Docker
   - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
   - echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
   - apt-get update
   - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
-  # Enable and start Docker
+  # Enable and start Docker (daemon.json already in place from write_files)
   - systemctl enable docker
-  - systemctl start docker
+  - systemctl restart docker
+
+  # Add deployer to docker group (group created by Docker install)
+  - usermod -aG docker deployer
 
   # Configure automatic security updates
   - echo 'APT::Periodic::Update-Package-Lists "1";' > /etc/apt/apt.conf.d/20auto-upgrades
   - echo 'APT::Periodic::Unattended-Upgrade "1";' >> /etc/apt/apt.conf.d/20auto-upgrades
 
-  # Configure fail2ban for SSH protection
-  - systemctl enable fail2ban
-  - systemctl start fail2ban
-
-  # Change SSH port to ${ssh_port}
-  - mkdir -p /etc/ssh/sshd_config.d
-  - echo "Port ${ssh_port}" > /etc/ssh/sshd_config.d/custom_port.conf
-  
-  # Restart SSH service
-  - systemctl restart sshd
-
-  # Configure UFW firewall to allow only specified ports
+  # Configure UFW firewall BEFORE changing SSH port
   - ufw --force reset
   - ufw default deny incoming
   - ufw default allow outgoing
@@ -206,6 +213,15 @@ runcmd:
   - ufw allow 443/udp comment 'HTTPS UDP (HTTP/3)'
   - ufw allow 8081/tcp comment 'Custom application port'
   - ufw --force enable
+
+  # Change SSH port to ${ssh_port} and restart (after UFW allows the new port)
+  - mkdir -p /etc/ssh/sshd_config.d
+  - echo "Port ${ssh_port}" > /etc/ssh/sshd_config.d/custom_port.conf
+  - systemctl restart ssh
+
+  # Start fail2ban (jail.local already in place from write_files with custom SSH port)
+  - systemctl enable fail2ban
+  - systemctl restart fail2ban
 
   # Create cloudlab directory structure
   - mkdir -p /opt/cloudlab/alloy

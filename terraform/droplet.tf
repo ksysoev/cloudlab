@@ -9,7 +9,7 @@ resource "digitalocean_droplet" "swarm_manager" {
 
   # User data for initial setup
   user_data = templatefile("${path.module}/cloud-init.yaml", {
-    deployer_ssh_key          = var.deployer_ssh_public_key != "" ? var.deployer_ssh_public_key : var.ssh_public_key
+    deployer_ssh_key          = var.ssh_public_key
     ssh_port                  = var.ssh_port
     grafana_cloud_logs_url    = var.grafana_cloud_logs_url
     grafana_cloud_logs_id     = var.grafana_cloud_logs_id

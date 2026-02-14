@@ -33,12 +33,6 @@ variable "ssh_public_key" {
   type        = string
 }
 
-variable "deployer_ssh_public_key" {
-  description = "SSH public key for the deployer user (used by GitHub Actions)"
-  type        = string
-  default     = ""
-}
-
 variable "allowed_ssh_ips" {
   description = "List of IP addresses allowed to SSH (empty = allow all). Note: IP whitelisting removed as no static IP available."
   type        = list(string)
