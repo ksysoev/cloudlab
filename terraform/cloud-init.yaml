@@ -204,9 +204,11 @@ runcmd:
   - echo 'APT::Periodic::Unattended-Upgrade "1";' >> /etc/apt/apt.conf.d/20auto-upgrades
 
   # Configure UFW firewall BEFORE changing SSH port
+  # Allow port 22 temporarily so SSH remains reachable during the port transition
   - ufw --force reset
   - ufw default deny incoming
   - ufw default allow outgoing
+  - ufw allow 22/tcp comment 'SSH default port (temporary)'
   - ufw allow ${ssh_port}/tcp comment 'SSH on custom port'
   - ufw allow 80/tcp comment 'HTTP'
   - ufw allow 443/tcp comment 'HTTPS TCP'
@@ -218,6 +220,9 @@ runcmd:
   - mkdir -p /etc/ssh/sshd_config.d
   - echo "Port ${ssh_port}" > /etc/ssh/sshd_config.d/custom_port.conf
   - systemctl restart ssh
+
+  # Remove temporary port 22 rule now that SSH is on the custom port
+  - ufw delete allow 22/tcp
 
   # Start fail2ban (jail.local already in place from write_files with custom SSH port)
   - systemctl enable fail2ban
