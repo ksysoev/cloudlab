@@ -64,7 +64,10 @@ jobs:
 
       - name: Terraform Init
         id: init
-        run: terraform init
+        run: |
+          echo "TFC_CLOUD_ORGANIZATION is set: $([ -n \"$TFC_CLOUD_ORGANIZATION\" ] && echo 'yes' || echo 'no')"
+          echo "TFC_CLOUD_ORGANIZATION length: ${#TFC_CLOUD_ORGANIZATION}"
+          terraform init
 
       - name: Terraform Validate
         id: validate
