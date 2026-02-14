@@ -6,11 +6,6 @@ on:
       - main
     paths:
       - 'terraform/**'
-  pull_request:
-    branches:
-      - main
-    paths:
-      - 'terraform/**'
   workflow_dispatch:
     inputs:
       action:
@@ -32,8 +27,8 @@ jobs:
     name: Terraform ${{ github.event.inputs.action || 'plan' }}
     runs-on: ubuntu-latest
     
-    # Use production environment for apply/destroy
-    environment: ${{ (github.event.inputs.action == 'apply' || github.event.inputs.action == 'destroy') && 'production' || '' }}
+    # Always use production environment for main branch operations
+    environment: production
     
     defaults:
       run:
@@ -68,41 +63,6 @@ jobs:
         run: terraform plan -no-color -input=false
         env:
           TF_VAR_do_token: ${{ secrets.DO_TOKEN }}
-        continue-on-error: true
-
-      - name: Update Pull Request
-        uses: actions/github-script@v7
-        if: github.event_name == 'pull_request'
-        env:
-          PLAN: ${{ steps.plan.outputs.stdout }}
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const output = `#### Terraform Format and Style 🖌\`${{ steps.fmt.outcome }}\`
-            #### Terraform Initialization ⚙️\`${{ steps.init.outcome }}\`
-            #### Terraform Validation 🤖\`${{ steps.validate.outcome }}\`
-            #### Terraform Plan 📖\`${{ steps.plan.outcome }}\`
-
-            <details><summary>Show Plan</summary>
-
-            \`\`\`terraform
-            ${process.env.PLAN}
-            \`\`\`
-
-            </details>
-
-            *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
-
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: output
-            })
-
-      - name: Terraform Plan Status
-        if: steps.plan.outcome == 'failure'
-        run: exit 1
 
       - name: Terraform Apply
         if: github.event.inputs.action == 'apply' && github.ref == 'refs/heads/main'
@@ -122,6 +82,7 @@ jobs:
         run: |
           echo "droplet_ip=$(terraform output -raw droplet_ip)" >> $GITHUB_OUTPUT
           echo "droplet_name=$(terraform output -raw droplet_name)" >> $GITHUB_OUTPUT
+          echo "ssh_port=$(terraform output -raw ssh_port)" >> $GITHUB_OUTPUT
 
       - name: Deployment Summary
         if: github.event.inputs.action == 'apply' && github.ref == 'refs/heads/main'
@@ -130,9 +91,12 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **Droplet IP:** ${{ steps.outputs.outputs.droplet_ip }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Droplet Name:** ${{ steps.outputs.outputs.droplet_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **SSH Command:** \`ssh deployer@${{ steps.outputs.outputs.droplet_ip }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **SSH Port:** ${{ steps.outputs.outputs.ssh_port }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **SSH Command:** \`ssh -p ${{ steps.outputs.outputs.ssh_port }} deployer@${{ steps.outputs.outputs.droplet_ip }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Please configure your project repositories with the following secrets:" >> $GITHUB_STEP_SUMMARY
-          echo "- \`SWARM_HOST\`: ${{ steps.outputs.outputs.droplet_ip }}" >> $GITHUB_STEP_SUMMARY
-          echo "- \`SWARM_SSH_KEY\`: Your deployer SSH private key" >> $GITHUB_STEP_SUMMARY
-          echo "- \`SWARM_USER\`: deployer" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "1. Wait 5-10 minutes for cloud-init to complete" >> $GITHUB_STEP_SUMMARY
+          echo "2. Test SSH access: \`ssh -p ${{ steps.outputs.outputs.ssh_port }} root@${{ steps.outputs.outputs.droplet_ip }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "3. Verify Docker Swarm: \`docker node ls\`" >> $GITHUB_STEP_SUMMARY
+
