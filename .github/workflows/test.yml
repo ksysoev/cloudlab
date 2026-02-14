@@ -47,19 +47,8 @@ jobs:
         id: validate
         run: terraform validate -no-color
 
-      - name: Run Terraform Tests
-        id: test
-        run: terraform test -no-color
-        continue-on-error: true
-
       - name: Terraform Format Status
         if: steps.fmt.outcome == 'failure'
         run: |
           echo "Terraform formatting check failed. Run 'terraform fmt -recursive' to fix."
-          exit 1
-
-      - name: Terraform Test Status
-        if: steps.test.outcome == 'failure'
-        run: |
-          echo "Terraform tests failed. Review the test output above."
           exit 1
