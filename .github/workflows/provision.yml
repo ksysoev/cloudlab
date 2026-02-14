@@ -25,7 +25,6 @@ permissions:
 env:
   TF_VERSION: '1.9.0'
   TF_WORKING_DIR: './terraform'
-  TFC_CLOUD_ORGANIZATION: ${{ secrets.TF_CLOUD_ORG }}
 
 jobs:
   terraform:
@@ -34,6 +33,9 @@ jobs:
     
     # Always use production environment for main branch operations
     environment: production
+
+    env:
+      TFC_CLOUD_ORGANIZATION: ${{ secrets.TF_CLOUD_ORG }}
     
     defaults:
       run:
