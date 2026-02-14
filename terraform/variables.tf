@@ -7,7 +7,13 @@ variable "do_token" {
 variable "do_region" {
   description = "DigitalOcean region for the droplet"
   type        = string
-  default     = "nyc3"
+  default     = "fra1"
+}
+
+variable "ssh_port" {
+  description = "SSH port (non-standard for security)"
+  type        = number
+  default     = 1923
 }
 
 variable "droplet_size" {
@@ -41,7 +47,7 @@ variable "deployer_ssh_public_key" {
 }
 
 variable "allowed_ssh_ips" {
-  description = "List of IP addresses allowed to SSH (empty = allow all)"
+  description = "List of IP addresses allowed to SSH (empty = allow all). Note: IP whitelisting removed as no static IP available."
   type        = list(string)
   default     = []
 }

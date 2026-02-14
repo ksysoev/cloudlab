@@ -8,7 +8,11 @@ do_token = "dop_v1_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 
 # Region where the droplet will be created
 # Available regions: nyc1, nyc3, sfo3, ams3, sgp1, lon1, fra1, tor1, blr1, syd1
-do_region = "nyc3"
+do_region = "fra1"
+
+# SSH port (non-standard for security)
+# Default: 1923 (instead of standard port 22)
+ssh_port = 1923
 
 # Droplet size
 # s-1vcpu-1gb     = $6/mo  - 1GB RAM, 1 vCPU, 25GB SSD
@@ -30,10 +34,11 @@ ssh_private_key_path = "~/.ssh/id_rsa"
 # Generate a separate key for CI/CD with: ssh-keygen -t ed25519 -f ~/.ssh/cloudlab_deployer -C "cloudlab-deployer"
 deployer_ssh_public_key = ""
 
-# Restrict SSH access to specific IPs (optional)
-# Empty list = allow from anywhere
-# Example: ["1.2.3.4/32", "5.6.7.8/32"]
-allowed_ssh_ips = []
+# Note: IP whitelisting is not used as no static IP is available
+# The firewall allows connections from any IP to the following ports:
+# - TCP: 1923 (SSH), 80 (HTTP), 443 (HTTPS), 8081 (Custom)
+# - UDP: 443 (HTTP/3)
+# All other ports are blocked by default
 
 # Grafana Cloud configuration (optional)
 # If you have a Grafana Cloud account, fill these in

@@ -19,7 +19,7 @@ CloudLab provides a complete infrastructure setup for hosting multiple pet proje
 - **Automatic SSL:** (Configure Traefik or use project-level SSL)
 - **Monitoring:** Built-in Grafana Alloy for observability
 - **Scalable:** Start with one node, scale to multi-node cluster
-- **Secure:** Firewall rules, SSH key authentication, secrets management
+- **Secure:** Non-standard SSH port, firewall rules, key authentication
 
 ## Quick Start
 
@@ -66,6 +66,7 @@ jobs:
     secrets:
       SWARM_HOST: ${{ secrets.SWARM_HOST }}
       SWARM_SSH_KEY: ${{ secrets.SWARM_SSH_KEY }}
+      SWARM_SSH_PORT: ${{ secrets.SWARM_SSH_PORT }}
       SWARM_USER: ${{ secrets.SWARM_USER }}
 ```
 
@@ -97,7 +98,7 @@ See the [Deployment Guide](docs/DEPLOYMENT.md) for details.
 │  │                                                      │  │
 │  └──────────────────────────────────────────────────────┘  │
 │                                                             │
-│  Firewall: SSH (22), HTTP (80), HTTPS (443), Swarm ports   │
+│  Firewall: SSH (1923), HTTP (80), HTTPS (443), Custom (8081)  │
 └─────────────────────────────────────────────────────────────┘
                            │
                            │ GitHub Actions
@@ -219,12 +220,15 @@ See [examples in the deployment guide](docs/DEPLOYMENT.md#examples).
 
 ## Security
 
+- **Non-Standard SSH Port:** SSH runs on port 1923 (not 22)
 - **SSH Key Authentication:** No password authentication
-- **Firewall:** Only necessary ports open
+- **Firewall:** Only ports 1923, 80, 443, 8081 (TCP) and 443 (UDP) exposed
+- **Ubuntu 24.04 LTS:** Latest LTS release with automatic security updates
 - **Secrets Management:** GitHub Secrets + Docker Secrets
-- **Automatic Updates:** Security patches applied automatically
 - **Fail2ban:** Protection against brute-force attacks
-- **Private Registry:** Images in GHCR
+- **UFW Firewall:** Host-based firewall for defense in depth
+
+See [SECURITY.md](docs/SECURITY.md) for detailed security information.
 
 ## Monitoring
 

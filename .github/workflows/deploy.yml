@@ -47,6 +47,9 @@ on:
       SWARM_USER:
         description: 'SSH username for deployment'
         required: false
+      SWARM_SSH_PORT:
+        description: 'SSH port for deployment'
+        required: false
 
 jobs:
   deploy:
@@ -97,11 +100,13 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Prepare SSH key
+        env:
+          SWARM_SSH_PORT: ${{ secrets.SWARM_SSH_PORT || '1923' }}
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SWARM_SSH_KEY }}" > ~/.ssh/swarm_key
           chmod 600 ~/.ssh/swarm_key
-          ssh-keyscan -H ${{ secrets.SWARM_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -p $SWARM_SSH_PORT -H ${{ secrets.SWARM_HOST }} >> ~/.ssh/known_hosts
 
       - name: Update image tags in compose file
         if: inputs.build_image
@@ -124,10 +129,12 @@ jobs:
       - name: Copy compose file to swarm manager
         env:
           SWARM_USER: ${{ secrets.SWARM_USER || 'deployer' }}
+          SWARM_SSH_PORT: ${{ secrets.SWARM_SSH_PORT || '1923' }}
         run: |
           COMPOSE_FILE="${{ inputs.build_image && 'docker-compose.deploy.yml' || inputs.compose_file }}"
           
           scp -i ~/.ssh/swarm_key \
+            -P $SWARM_SSH_PORT \
             -o StrictHostKeyChecking=no \
             ${{ inputs.working_directory }}/$COMPOSE_FILE \
             $SWARM_USER@${{ secrets.SWARM_HOST }}:/tmp/${{ inputs.stack_name }}-compose.yml
@@ -135,8 +142,10 @@ jobs:
       - name: Deploy stack to swarm
         env:
           SWARM_USER: ${{ secrets.SWARM_USER || 'deployer' }}
+          SWARM_SSH_PORT: ${{ secrets.SWARM_SSH_PORT || '1923' }}
         run: |
           ssh -i ~/.ssh/swarm_key \
+            -p $SWARM_SSH_PORT \
             -o StrictHostKeyChecking=no \
             $SWARM_USER@${{ secrets.SWARM_HOST }} << 'EOF'
             set -e
@@ -175,11 +184,13 @@ jobs:
       - name: Verify deployment
         env:
           SWARM_USER: ${{ secrets.SWARM_USER || 'deployer' }}
+          SWARM_SSH_PORT: ${{ secrets.SWARM_SSH_PORT || '1923' }}
         run: |
           echo "Waiting for services to stabilize..."
           sleep 10
           
           ssh -i ~/.ssh/swarm_key \
+            -p $SWARM_SSH_PORT \
             -o StrictHostKeyChecking=no \
             $SWARM_USER@${{ secrets.SWARM_HOST }} << 'EOF'
             echo "=== Final deployment status ==="

@@ -1,4 +1,4 @@
-# Data source to get the latest Ubuntu 22.04 LTS image
+# Data source to get the latest Ubuntu 24.04 LTS image
 data "digitalocean_images" "ubuntu" {
   filter {
     key    = "distribution"
@@ -6,7 +6,7 @@ data "digitalocean_images" "ubuntu" {
   }
   filter {
     key    = "name"
-    values = ["22.04"]
+    values = ["24.04"]
   }
   sort {
     key       = "created"
@@ -26,6 +26,7 @@ resource "digitalocean_droplet" "swarm_manager" {
   # User data for initial setup
   user_data = templatefile("${path.module}/cloud-init.yaml", {
     deployer_ssh_key        = var.deployer_ssh_public_key != "" ? var.deployer_ssh_public_key : file(var.ssh_public_key_path)
+    ssh_port                = var.ssh_port
     grafana_cloud_endpoint  = var.grafana_cloud_endpoint
     grafana_cloud_username  = var.grafana_cloud_username
     grafana_cloud_api_key   = var.grafana_cloud_api_key
@@ -59,6 +60,7 @@ resource "null_resource" "wait_for_cloud_init" {
       type        = "ssh"
       user        = "root"
       host        = digitalocean_droplet.swarm_manager.ipv4_address
+      port        = var.ssh_port
       private_key = file(var.ssh_private_key_path)
       timeout     = "10m"
     }

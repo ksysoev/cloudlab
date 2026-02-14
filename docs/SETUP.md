@@ -2,6 +2,17 @@
 
 This guide will walk you through setting up the CloudLab infrastructure from scratch.
 
+## Security Notice
+
+CloudLab is configured with enhanced security:
+- **SSH on port 1923** (non-standard port for security)
+- **Ubuntu 24.04 LTS** (latest LTS release)
+- **Region: Frankfurt (fra1)** by default
+- **Firewall**: Only ports 1923, 80, 443, 8081 (TCP) and 443 (UDP) are exposed
+- **No IP whitelisting**: No static IP required
+
+See [SECURITY.md](./SECURITY.md) for detailed security information.
+
 ## Prerequisites
 
 Before you begin, ensure you have:
@@ -91,7 +102,10 @@ cp terraform.tfvars.example terraform.tfvars
 do_token = "dop_v1_your_token_here"
 
 # Region (see: https://slugs.do-api.dev/)
-do_region = "nyc3"  # or sfo3, ams3, etc.
+do_region = "fra1"  # Frankfurt, Germany (default)
+
+# SSH port (non-standard for security)
+ssh_port = 1923
 
 # Droplet configuration
 droplet_size = "s-1vcpu-2gb"  # $12/mo
@@ -103,10 +117,6 @@ ssh_private_key_path = "~/.ssh/id_ed25519"
 
 # Optional: Separate deployer key for GitHub Actions
 deployer_ssh_public_key = "ssh-ed25519 AAAAC3... cloudlab-deployer"
-
-# Optional: Restrict SSH access to your IP
-# Get your IP: curl ifconfig.me
-allowed_ssh_ips = ["YOUR.IP.ADDRESS.HERE/32"]
 
 # Optional: Grafana Cloud configuration
 grafana_cloud_endpoint  = ""  # Fill if you have Grafana Cloud
@@ -168,18 +178,19 @@ Outputs:
 
 droplet_ip = "164.90.xxx.xxx"
 droplet_name = "cloudlab-swarm"
-ssh_connection_string = "ssh root@164.90.xxx.xxx"
-deployer_connection_string = "ssh deployer@164.90.xxx.xxx"
+ssh_port = 1923
+ssh_connection_string = "ssh -p 1923 root@164.90.xxx.xxx"
+deployer_connection_string = "ssh -p 1923 deployer@164.90.xxx.xxx"
 ```
 
 Test SSH access:
 
 ```bash
 # As root
-ssh root@<your-droplet-ip>
+ssh -p 1923 root@<your-droplet-ip>
 
 # As deployer user
-ssh deployer@<your-droplet-ip>
+ssh -p 1923 deployer@<your-droplet-ip>
 ```
 
 ## Step 10: Verify Docker Swarm
@@ -208,8 +219,11 @@ Your project repositories need these secrets to deploy:
 ```
 SWARM_HOST = <your-droplet-ip>
 SWARM_SSH_KEY = <contents of ~/.ssh/cloudlab_deployer (private key)>
+SWARM_SSH_PORT = 1923
 SWARM_USER = deployer
 ```
+
+**Note:** The `SWARM_SSH_PORT` defaults to 1923 if not provided, but it's good practice to set it explicitly.
 
 ## Step 12: Configure GitHub Actions in CloudLab Repo
 
@@ -268,15 +282,22 @@ export TF_TOKEN_app_terraform_io="your-token"
 
 ### Cannot SSH to droplet
 
-1. Check if firewall allows your IP:
-   - Update `allowed_ssh_ips` in `terraform.tfvars`
-   - Run `terraform apply` again
+1. Wait 5-10 minutes for cloud-init to complete and SSH port to change
 
-2. Verify SSH key is correct:
+2. Verify you're using the correct port:
+   ```bash
+   ssh -p 1923 root@<droplet-ip>
+   ```
+
+3. Verify SSH key is correct:
    ```bash
    ssh-add -l  # List loaded keys
    ssh-add ~/.ssh/id_ed25519  # Add your key
    ```
+
+4. Check DigitalOcean firewall allows port 1923
+
+5. If still unable to connect, use DigitalOcean Console (web-based terminal)
 
 ### Cloud-init didn't complete
 
