@@ -1,6 +1,9 @@
 // Grafana Alloy Configuration for CloudLab Swarm
 // This configuration collects Docker container logs and metrics
-// Customize this file based on your Grafana Cloud setup
+//
+// This is a template file. Placeholders are replaced with actual values
+// at container startup via sed substitution in docker-compose.yml.
+// See alloy/.env.example for the required environment variables.
 
 logging {
   level  = "info"
@@ -70,33 +73,27 @@ loki.process "containers" {
   }
 }
 
-// Configure Grafana Cloud Loki endpoint
-// Replace these values with your actual Grafana Cloud credentials
+// Configure Grafana Cloud Loki endpoint for logs
+// Credentials are injected from environment variables at container startup
 loki.write "default" {
   endpoint {
-    // Example: url = "https://logs-prod-us-central1.grafana.net/loki/api/v1/push"
-    url = "REPLACE_WITH_YOUR_GRAFANA_CLOUD_LOKI_URL"
-    
+    url = "GRAFANA_CLOUD_LOGS_URL_PLACEHOLDER"
+
     basic_auth {
-      // Example: username = "123456"
-      username = "REPLACE_WITH_YOUR_GRAFANA_CLOUD_USERNAME"
-      // Example: password = "glc_xxxxx"
-      password = "REPLACE_WITH_YOUR_GRAFANA_CLOUD_API_KEY"
+      username = "GRAFANA_CLOUD_LOGS_ID_PLACEHOLDER"
+      password = "GRAFANA_CLOUD_API_KEY_PLACEHOLDER"
     }
   }
 }
 
-// Configure Grafana Cloud Prometheus endpoint
+// Configure Grafana Cloud Prometheus endpoint for metrics
 prometheus.remote_write "default" {
   endpoint {
-    // Example: url = "https://prometheus-prod-us-central1.grafana.net/api/prom/push"
-    url = "REPLACE_WITH_YOUR_GRAFANA_CLOUD_PROMETHEUS_URL"
-    
+    url = "GRAFANA_CLOUD_METRICS_URL_PLACEHOLDER"
+
     basic_auth {
-      // Example: username = "123456"
-      username = "REPLACE_WITH_YOUR_GRAFANA_CLOUD_USERNAME"
-      // Example: password = "glc_xxxxx"
-      password = "REPLACE_WITH_YOUR_GRAFANA_CLOUD_API_KEY"
+      username = "GRAFANA_CLOUD_METRICS_ID_PLACEHOLDER"
+      password = "GRAFANA_CLOUD_API_KEY_PLACEHOLDER"
     }
   }
 }

@@ -68,33 +68,35 @@ write_files:
         forward_to = [loki.write.default.receiver]
       }
 
-      // Configure Grafana Cloud endpoint (if provided)
-      %{ if grafana_cloud_endpoint != "" }
+      // Configure Grafana Cloud endpoints (if provided)
+      %{ if grafana_cloud_logs_url != "" }
       loki.write "default" {
         endpoint {
-          url = "${grafana_cloud_endpoint}/loki/api/v1/push"
+          url = "${grafana_cloud_logs_url}"
           basic_auth {
-            username = "${grafana_cloud_username}"
-            password = "${grafana_cloud_api_key}"
-          }
-        }
-      }
-
-      prometheus.remote_write "default" {
-        endpoint {
-          url = "${grafana_cloud_endpoint}/api/prom/push"
-          basic_auth {
-            username = "${grafana_cloud_username}"
+            username = "${grafana_cloud_logs_id}"
             password = "${grafana_cloud_api_key}"
           }
         }
       }
       %{ else }
-      // No Grafana Cloud endpoint configured
+      // No Grafana Cloud logs endpoint configured
       // Logs will be stored locally only
       loki.write "default" {
         endpoint {
           url = "http://localhost:3100/loki/api/v1/push"
+        }
+      }
+      %{ endif }
+
+      %{ if grafana_cloud_metrics_url != "" }
+      prometheus.remote_write "default" {
+        endpoint {
+          url = "${grafana_cloud_metrics_url}"
+          basic_auth {
+            username = "${grafana_cloud_metrics_id}"
+            password = "${grafana_cloud_api_key}"
+          }
         }
       }
       %{ endif }
@@ -151,12 +153,12 @@ write_files:
       fi
 
       # Deploy Grafana Alloy only if endpoint is configured
-      if [ -n "${grafana_cloud_endpoint}" ]; then
+      if [ -n "${grafana_cloud_logs_url}" ] || [ -n "${grafana_cloud_metrics_url}" ]; then
         echo "Deploying Grafana Alloy..."
         cd /opt/cloudlab/alloy
         docker stack deploy -c docker-compose.yml monitoring || echo "Alloy deployment failed (please check configuration)"
       else
-        echo "Grafana Cloud endpoint not configured; skipping Grafana Alloy deployment."
+        echo "Grafana Cloud endpoints not configured; skipping Grafana Alloy deployment."
         echo "To deploy Alloy later, configure your endpoints and run:"
         echo "  cd /opt/cloudlab/alloy && docker stack deploy -c docker-compose.yml monitoring"
       fi

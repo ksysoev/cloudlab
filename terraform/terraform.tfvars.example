@@ -41,11 +41,13 @@ deployer_ssh_public_key = ""
 # All other ports are blocked by default
 
 # Grafana Cloud configuration (optional)
-# If you have a Grafana Cloud account, fill these in
-# Otherwise, leave empty and configure later
-grafana_cloud_endpoint  = ""  # e.g., "https://your-instance.grafana.net"
-grafana_cloud_username  = ""  # e.g., "123456"
-grafana_cloud_api_key   = ""  # Your Grafana Cloud API key
+# Get these values from the Grafana Cloud portal or the Alloy install command.
+# Leave empty to skip Grafana Cloud integration during provisioning.
+grafana_cloud_logs_url    = "" # Loki push URL
+grafana_cloud_logs_id     = "" # Loki instance ID
+grafana_cloud_metrics_url = "" # Prometheus push URL
+grafana_cloud_metrics_id  = "" # Prometheus instance ID
+grafana_cloud_api_key     = "" # Shared API key
 
 # Tags for organizing resources
 tags = ["cloudlab", "swarm", "terraform", "production"]

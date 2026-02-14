@@ -13,11 +13,8 @@ terraform {
   }
 
   # Terraform Cloud backend configuration
-  # Run `terraform login` to authenticate
-  # TODO: Replace "YOUR_ORG_NAME" with your actual Terraform Cloud organization name
+  # Organization is set via TFC_CLOUD_ORGANIZATION environment variable
   cloud {
-    organization = "YOUR_ORG_NAME"
-
     workspaces {
       name = "cloudlab-infrastructure"
     }

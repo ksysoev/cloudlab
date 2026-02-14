@@ -52,15 +52,29 @@ variable "allowed_ssh_ips" {
   default     = []
 }
 
-variable "grafana_cloud_endpoint" {
-  description = "Grafana Cloud endpoint for metrics and logs (optional)"
+variable "grafana_cloud_logs_url" {
+  description = "Grafana Cloud Loki push endpoint URL (optional)"
   type        = string
   default     = ""
   sensitive   = true
 }
 
-variable "grafana_cloud_username" {
-  description = "Grafana Cloud username for authentication (optional)"
+variable "grafana_cloud_logs_id" {
+  description = "Grafana Cloud Loki instance ID (optional)"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "grafana_cloud_metrics_url" {
+  description = "Grafana Cloud Prometheus push endpoint URL (optional)"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "grafana_cloud_metrics_id" {
+  description = "Grafana Cloud Prometheus instance ID (optional)"
   type        = string
   default     = ""
   sensitive   = true
