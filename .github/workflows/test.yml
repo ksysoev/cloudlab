@@ -13,6 +13,10 @@ on:
     paths:
       - 'terraform/**'
 
+permissions:
+  contents: read
+  security-events: write
+
 env:
   TF_VERSION: '1.6.0'
   TF_WORKING_DIR: './terraform'
@@ -54,39 +58,6 @@ jobs:
         run: terraform test -no-color
         continue-on-error: true
 
-      - name: Update Pull Request
-        uses: actions/github-script@v7
-        if: github.event_name == 'pull_request'
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const output = `## Terraform Test Results
-            
-            #### Format and Style 🖌 \`${{ steps.fmt.outcome }}\`
-            #### Initialization ⚙️ \`${{ steps.init.outcome }}\`
-            #### Validation 🤖 \`${{ steps.validate.outcome }}\`
-            #### Tests 🧪 \`${{ steps.test.outcome }}\`
-            
-            <details><summary>Test Details</summary>
-            
-            \`\`\`
-            Format Check: ${{ steps.fmt.outcome }}
-            Init: ${{ steps.init.outcome }}
-            Validate: ${{ steps.validate.outcome }}
-            Tests: ${{ steps.test.outcome }}
-            \`\`\`
-            
-            </details>
-            
-            *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`, Working Directory: \`${{ env.TF_WORKING_DIR }}\`*`;
-
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: output
-            })
-
       - name: Terraform Format Status
         if: steps.fmt.outcome == 'failure'
         run: |
@@ -98,3 +69,33 @@ jobs:
         run: |
           echo "Terraform tests failed. Review the test output above."
           exit 1
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy security scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'config'
+          scan-ref: 'terraform'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '0'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Run tfsec security scan
+        uses: aquasecurity/tfsec-action@v1.0.3
+        with:
+          working_directory: terraform
+          soft_fail: true
