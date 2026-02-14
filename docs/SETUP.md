@@ -320,9 +320,9 @@ sudo /usr/local/bin/init-swarm.sh
 
 Now that your infrastructure is set up:
 
-1. Read [DEPLOYMENT.md](./DEPLOYMENT.md) to learn how to deploy projects
-2. Review [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) for common issues
-3. Deploy your first pet project!
+1. Review [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) for common issues
+2. Check [QUICK_REFERENCE.md](./QUICK_REFERENCE.md) for useful commands
+3. Start deploying your services to the swarm using `docker stack deploy`
 
 ## Cost Estimate
 
@@ -331,7 +331,7 @@ Now that your infrastructure is set up:
 - **DigitalOcean Bandwidth:** 2TB included, then $0.01/GB
 - **Grafana Cloud:** Free tier (14-day retention)
 
-**Total:** ~$12-15/month
+**Total:** ~$12/month
 
 ## Scaling Up
 

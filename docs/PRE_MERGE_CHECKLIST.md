@@ -179,7 +179,7 @@ Once all checkboxes are complete:
 After merging:
 1. Switch to `main` branch: `git checkout main && git pull`
 2. Follow post-merge steps above
-3. Deploy your first project!
+3. Start deploying services to your swarm cluster!
 
 ## 📝 Notes
 

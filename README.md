@@ -1,22 +1,22 @@
 # CloudLab
 
-Infrastructure as Code for deploying pet projects to Docker Swarm on DigitalOcean.
+Infrastructure as Code for provisioning Docker Swarm on DigitalOcean.
 
 ## Overview
 
-CloudLab provides a complete infrastructure setup for hosting multiple pet projects on a single DigitalOcean droplet running Docker Swarm. It includes:
+CloudLab provides Terraform configuration for provisioning a secure, production-ready Docker Swarm cluster on DigitalOcean. It includes:
 
-- **Terraform** configuration for provisioning infrastructure
+- **Terraform** configuration for infrastructure provisioning
 - **Docker Swarm** single-node cluster (easily scalable)
 - **Grafana Alloy** for logs and metrics collection
-- **Reusable GitHub Actions workflow** for easy deployments
+- **Security hardening** with firewall, SSH configuration, and best practices
 - **Complete documentation** for setup and usage
 
 ## Features
 
-- **Cost-effective:** ~$12/month for hosting multiple projects
-- **Easy deployments:** Simple GitHub Actions workflow integration
-- **Automatic SSL:** (Configure Traefik or use project-level SSL)
+- **Cost-effective:** ~$12/month for a production-ready swarm cluster
+- **Production-ready:** Hardened security configuration out of the box
+- **Infrastructure as Code:** Reproducible, version-controlled infrastructure
 - **Monitoring:** Built-in Grafana Alloy for observability
 - **Scalable:** Start with one node, scale to multi-node cluster
 - **Secure:** Non-standard SSH port, firewall rules, key authentication
@@ -56,35 +56,27 @@ terraform init
 terraform apply
 ```
 
-### 4. Deploy your first project
+### 3. Verify the deployment
 
-Add this workflow to your project's `.github/workflows/deploy.yml`:
+After Terraform completes, test SSH access:
 
-```yaml
-name: Deploy to CloudLab
+```bash
+# Get the droplet IP from outputs
+terraform output droplet_ip
 
-on:
-  push:
-    branches: [main]
+# Connect to the droplet
+ssh -p 1923 root@<droplet-ip>
 
-jobs:
-  deploy:
-    uses: YOUR_USERNAME/cloudlab/.github/workflows/deploy.yml@main
-    with:
-      stack_name: my-project
-    secrets:
-      SWARM_HOST: ${{ secrets.SWARM_HOST }}
-      SWARM_SSH_KEY: ${{ secrets.SWARM_SSH_KEY }}
-      SWARM_SSH_PORT: ${{ secrets.SWARM_SSH_PORT }}
-      SWARM_USER: ${{ secrets.SWARM_USER }}
+# Verify Docker Swarm
+docker node ls
+docker service ls
 ```
 
-See the [Deployment Guide](docs/DEPLOYMENT.md) for details.
+Your infrastructure is now ready! Deploy workloads using `docker stack deploy` or integrate with your CI/CD pipeline.
 
 ## Documentation
 
 - **[Setup Guide](docs/SETUP.md)** - Initial infrastructure setup
-- **[Deployment Guide](docs/DEPLOYMENT.md)** - How to deploy projects
 - **[Security Guide](docs/SECURITY.md)** - Security configuration and best practices
 - **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Common issues and solutions
 - **[Quick Reference](docs/QUICK_REFERENCE.md)** - Command cheat sheet
@@ -112,11 +104,11 @@ See the [Deployment Guide](docs/DEPLOYMENT.md) for details.
 │  Firewall: SSH (1923), HTTP (80), HTTPS (443), Custom (8081)  │
 └─────────────────────────────────────────────────────────────┘
                            │
-                           │ GitHub Actions
+                           │ Terraform
                            ▼
               ┌────────────────────────┐
-              │   Your Project Repos   │
-              │  (Build & Deploy)      │
+              │   Infrastructure Setup │
+              │    (Provisioning)      │
               └────────────────────────┘
 ```
 
@@ -144,13 +136,14 @@ cloudlab/
 │   └── config.alloy        # Alloy configuration
 │
 ├── .github/workflows/      # GitHub Actions workflows
-│   ├── deploy.yml          # Reusable deployment workflow
 │   └── provision.yml       # Infrastructure provisioning
 │
 └── docs/                   # Documentation
     ├── SETUP.md            # Setup guide
-    ├── DEPLOYMENT.md       # Deployment guide
-    └── TROUBLESHOOTING.md  # Troubleshooting guide
+    ├── SECURITY.md         # Security guide
+    ├── TROUBLESHOOTING.md  # Troubleshooting guide
+    ├── QUICK_REFERENCE.md  # Command cheat sheet
+    └── PRE_MERGE_CHECKLIST.md  # Pre-deployment checklist
 ```
 
 ## Requirements
@@ -177,11 +170,10 @@ cloudlab/
 - **Droplet (s-1vcpu-2gb):** $12/month
 - **Terraform Cloud:** Free tier
 - **GitHub Actions:** Free tier (2000 minutes/month)
-- **GHCR:** Free for public repos
 - **Grafana Cloud:** Free tier (14-day retention)
 - **DigitalOcean Bandwidth:** 2TB included
 
-**Total: ~$12-15/month**
+**Total: ~$12/month**
 
 ## Use Cases
 
@@ -213,21 +205,19 @@ terraform apply
 
 ### Add More Services
 
-Each project gets its own Docker stack:
-- Isolated networks
-- Independent scaling
-- Easy rollbacks
+Deploy additional services to your swarm:
+- Each service gets its own Docker stack
+- Isolated networks for security
+- Independent scaling per service
+- Easy rollbacks with `docker stack` commands
 
-## Examples
+Deploy manually via SSH:
+```bash
+ssh -p 1923 deployer@<droplet-ip>
+docker stack deploy -c docker-compose.yml my-app
+```
 
-### Deploy a Node.js app
-
-1. Add Dockerfile to your project
-2. Add docker-compose.yml
-3. Add deployment workflow
-4. Push to GitHub → automatic deployment
-
-See [examples in the deployment guide](docs/DEPLOYMENT.md#examples).
+Or integrate with your preferred CI/CD pipeline.
 
 ## Security
 
@@ -261,7 +251,7 @@ Common issues and solutions are documented in [TROUBLESHOOTING.md](docs/TROUBLES
 
 Quick tips:
 - **Can't SSH?** Check firewall rules and SSH keys
-- **Deployment fails?** Verify GitHub secrets are set
+- **Terraform fails?** Verify API tokens and Terraform Cloud setup
 - **Service won't start?** Check logs with `docker service logs`
 - **Out of space?** Run `docker system prune -a`
 
@@ -272,11 +262,11 @@ MIT License - See [LICENSE](LICENSE) file
 ## Roadmap
 
 Future enhancements:
+- [ ] Deployment workflows and CI/CD integration examples
 - [ ] Traefik for automatic SSL and routing
 - [ ] Automated backups to DigitalOcean Spaces
 - [ ] Multi-region support
 - [ ] Database templates (Postgres, Redis, MongoDB)
-- [ ] Example projects with different tech stacks
 - [ ] Terraform modules for different node sizes
 - [ ] Staging environment support
 
