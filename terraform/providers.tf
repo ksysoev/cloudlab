@@ -11,7 +11,7 @@ terraform {
   # Terraform Cloud backend configuration
   # Run `terraform login` to authenticate
   cloud {
-    organization = "REPLACE_WITH_YOUR_ORG"
+    organization = "PetVerse"
 
     workspaces {
       name = "cloudlab-infrastructure"

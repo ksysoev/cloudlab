@@ -76,27 +76,3 @@ jobs:
         env:
           TF_VAR_do_token: ${{ secrets.DO_TOKEN }}
 
-      - name: Save Terraform Outputs
-        if: github.event.inputs.action == 'apply' && github.ref == 'refs/heads/main'
-        id: outputs
-        run: |
-          echo "droplet_ip=$(terraform output -raw droplet_ip)" >> $GITHUB_OUTPUT
-          echo "droplet_name=$(terraform output -raw droplet_name)" >> $GITHUB_OUTPUT
-          echo "ssh_port=$(terraform output -raw ssh_port)" >> $GITHUB_OUTPUT
-
-      - name: Deployment Summary
-        if: github.event.inputs.action == 'apply' && github.ref == 'refs/heads/main'
-        run: |
-          echo "### Infrastructure Provisioned 🎉" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Droplet IP:** ${{ steps.outputs.outputs.droplet_ip }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Droplet Name:** ${{ steps.outputs.outputs.droplet_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **SSH Port:** ${{ steps.outputs.outputs.ssh_port }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **SSH Command:** \`ssh -p ${{ steps.outputs.outputs.ssh_port }} deployer@${{ steps.outputs.outputs.droplet_ip }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "1. Wait 5-10 minutes for cloud-init to complete" >> $GITHUB_STEP_SUMMARY
-          echo "2. Test SSH access: \`ssh -p ${{ steps.outputs.outputs.ssh_port }} root@${{ steps.outputs.outputs.droplet_ip }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "3. Verify Docker Swarm: \`docker node ls\`" >> $GITHUB_STEP_SUMMARY
-
