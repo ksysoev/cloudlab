@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Web App - CloudLab</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 40px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+        }
+        h1 {
+            font-size: 3em;
+            margin: 0 0 20px 0;
+        }
+        p {
+            font-size: 1.2em;
+            line-height: 1.6;
+        }
+        .badge {
+            display: inline-block;
+            padding: 5px 15px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            margin: 5px;
+            font-size: 0.9em;
+        }
+        .info {
+            margin-top: 30px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Hello from CloudLab!</h1>
+        <p>This is a simple web application running on Docker Swarm.</p>
+        
+        <div class="badges">
+            <span class="badge">Docker Swarm</span>
+            <span class="badge">Nginx</span>
+            <span class="badge">DigitalOcean</span>
+            <span class="badge">GitHub Actions</span>
+        </div>
+        
+        <div class="info">
+            <h2>Deployment Info</h2>
+            <p><strong>Stack:</strong> simple-web-app</p>
+            <p><strong>Service:</strong> web</p>
+            <p><strong>Replicas:</strong> 2</p>
+            <p><strong>Port:</strong> 8080</p>
+        </div>
+        
+        <div class="info">
+            <h2>What's Next?</h2>
+            <ul>
+                <li>Edit <code>index.html</code> and push changes</li>
+                <li>Add more services to <code>docker-compose.yml</code></li>
+                <li>Scale your service with more replicas</li>
+                <li>Add a database or other dependencies</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>
