@@ -35,7 +35,7 @@ jobs:
     environment: production
 
     env:
-      TFC_CLOUD_ORGANIZATION: ${{ secrets.TF_CLOUD_ORG }}
+      TF_CLOUD_ORGANIZATION: ${{ secrets.TF_CLOUD_ORG }}
     
     defaults:
       run:
