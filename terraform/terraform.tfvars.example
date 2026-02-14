@@ -30,11 +30,6 @@ droplet_name = "cloudlab-swarm"
 # Can also be set via environment variable: TF_VAR_ssh_public_key
 ssh_public_key = "ssh-ed25519 AAAA... user@host"
 
-# SSH public key for the deployer user (used by GitHub Actions)
-# If not provided, will use the same key as ssh_public_key
-# Generate a separate key for CI/CD with: ssh-keygen -t ed25519 -f ~/.ssh/cloudlab_deployer -C "cloudlab-deployer"
-deployer_ssh_public_key = ""
-
 # Note: IP whitelisting is not used as no static IP is available
 # The firewall allows connections from any IP to the following ports:
 # - TCP: 1923 (SSH), 80 (HTTP), 443 (HTTPS), 8081 (Custom)
