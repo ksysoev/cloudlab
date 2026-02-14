@@ -31,7 +31,6 @@ variable "droplet_name" {
 variable "ssh_public_key" {
   description = "SSH public key content for droplet access"
   type        = string
-  sensitive   = true
 }
 
 variable "deployer_ssh_public_key" {
