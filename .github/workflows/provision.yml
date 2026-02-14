@@ -7,12 +7,6 @@ on:
     paths:
       - 'terraform/**'
       - '.github/workflows/provision.yml'
-  pull_request:
-    branches:
-      - main
-    paths:
-      - 'terraform/**'
-      - '.github/workflows/provision.yml'
   workflow_dispatch:
     inputs:
       action:
@@ -73,12 +67,12 @@ jobs:
 
       - name: Terraform Plan
         id: plan
-        if: github.event_name == 'pull_request' || github.event.inputs.action == 'plan'
+        if: github.event.inputs.action == 'plan'
         run: terraform plan -no-color -input=false
 
       - name: Terraform Apply
         id: apply
-        if: github.event_name != 'pull_request' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event.inputs.action == 'apply')
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event.inputs.action == 'apply'
         run: terraform apply -auto-approve -input=false
 
       - name: Terraform Destroy
