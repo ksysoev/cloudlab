@@ -21,7 +21,7 @@ users:
   - name: deployer
     sudo: ['ALL=(ALL) NOPASSWD:ALL']
     shell: /bin/bash
-    groups: users, admin
+    groups: users
     ssh_authorized_keys:
       - ${deployer_ssh_key}
 
