@@ -113,6 +113,9 @@
   when: docker_swarm_status.rc != 0
   register: docker_swarm_init
   changed_when: docker_swarm_init.rc == 0
+  failed_when:
+    - docker_swarm_init.rc != 0
+    - "'This node is already part of a swarm' not in docker_swarm_init.stderr"
   tags:
     - molecule-notest
 
