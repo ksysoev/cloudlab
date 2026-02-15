@@ -19,13 +19,18 @@ output "droplet_region" {
 }
 
 output "ssh_connection_string" {
-  description = "SSH connection string for the droplet"
-  value       = "ssh -p ${var.ssh_port} root@${digitalocean_droplet.swarm_manager.ipv4_address}"
+  description = "SSH connection string for the droplet (deployer user)"
+  value       = "ssh -p ${var.ssh_port} deployer@${digitalocean_droplet.swarm_manager.ipv4_address}"
 }
 
 output "deployer_connection_string" {
   description = "SSH connection string for the deployer user"
   value       = "ssh -p ${var.ssh_port} deployer@${digitalocean_droplet.swarm_manager.ipv4_address}"
+}
+
+output "root_connection_string" {
+  description = "SSH connection string for root user (DEPRECATED: root login is disabled for security)"
+  value       = "ssh -p ${var.ssh_port} root@${digitalocean_droplet.swarm_manager.ipv4_address}"
 }
 
 output "ssh_port" {
