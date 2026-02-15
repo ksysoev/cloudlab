@@ -11,7 +11,6 @@ permissions:
   contents: read
 
 env:
-  ANSIBLE_VERSION: '2.15.0'
   ANSIBLE_WORKING_DIR: './ansible'
 
 jobs:
@@ -44,7 +43,7 @@ jobs:
       - name: Install Ansible and dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install ansible==${{ env.ANSIBLE_VERSION }}
+          pip install -r requirements.txt
           ansible-galaxy collection install -r requirements.yml
 
       - name: Setup Terraform for dynamic inventory
