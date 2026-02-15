@@ -22,7 +22,7 @@ ansible/
 
 ## Requirements
 
-- Ansible >= 2.14
+- Ansible >= 2.15.0
 - Python 3
 - Terraform (for dynamic inventory)
 - SSH access to the droplet
@@ -135,10 +135,10 @@ cd ansible
 ./test.sh lint
 
 # Run Molecule tests for all roles
-./test.sh molecule
+./test.sh all
 
 # Run everything (lint + molecule)
-./test.sh all
+./test.sh
 ```
 
 ### Running Tests for Individual Roles

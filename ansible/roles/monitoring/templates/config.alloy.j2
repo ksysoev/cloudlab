@@ -73,6 +73,7 @@ discovery.relabel "integrations_node_exporter" {
   }
 }
 
+{% if grafana_cloud_metrics_url != "" %}
 // Scrape node exporter metrics
 prometheus.scrape "integrations_node_exporter" {
   targets    = discovery.relabel.integrations_node_exporter.output
@@ -81,9 +82,7 @@ prometheus.scrape "integrations_node_exporter" {
 
 // Filter and forward metrics
 prometheus.relabel "integrations_node_exporter" {
-{% if grafana_cloud_metrics_url != "" %}
   forward_to = [prometheus.remote_write.metrics_service.receiver]
-{% endif %}
 
   rule {
     source_labels = ["__name__"]
@@ -91,6 +90,7 @@ prometheus.relabel "integrations_node_exporter" {
     action        = "keep"
   }
 }
+{% endif %}
 
 // Docker container logs collection
 discovery.docker "logs_integrations_docker" {

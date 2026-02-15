@@ -186,8 +186,9 @@ jobs:
           cd ansible
           ansible-playbook playbooks/site.yml --syntax-check
 
-      - name: Run playbook check mode
+      - name: Run playbook check mode with mock inventory
         run: |
           cd ansible
-          ansible-playbook playbooks/site.yml --check
+          echo "localhost ansible_connection=local" > inventory.ini
+          ansible-playbook -i inventory.ini playbooks/site.yml --check
         continue-on-error: true

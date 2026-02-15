@@ -1,12 +1,6 @@
 name: Configure Server
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'ansible/**'
-      - '.github/workflows/configure.yml'
   workflow_dispatch: {}
   workflow_run:
     workflows: ["Provision Infrastructure"]
@@ -51,7 +45,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install ansible==${{ env.ANSIBLE_VERSION }}
-          ansible-galaxy collection install community.general
+          ansible-galaxy collection install -r requirements.yml
 
       - name: Setup Terraform for dynamic inventory
         uses: hashicorp/setup-terraform@v3
@@ -64,12 +58,30 @@ jobs:
         run: terraform init
         working-directory: ./terraform
 
+      - name: Wait for droplet SSH after reboot
+        run: |
+          DROPLET_IP=$(cd terraform && terraform output -raw droplet_ip)
+          SSH_PORT="${{ secrets.SWARM_SSH_PORT || '1923' }}"
+          echo "Waiting for SSH on ${DROPLET_IP}:${SSH_PORT}..."
+          for i in {1..30}; do
+            if nc -z -w 5 "${DROPLET_IP}" "${SSH_PORT}" 2>/dev/null; then
+              echo "SSH port is open on ${DROPLET_IP}:${SSH_PORT}"
+              sleep 5  # Wait a bit more for SSH service to be fully ready
+              exit 0
+            fi
+            echo "SSH not ready yet, retrying in 10 seconds... (attempt ${i}/30)"
+            sleep 10
+          done
+          echo "SSH did not become available within the expected time."
+          exit 1
+
       - name: Configure SSH key
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -p ${{ secrets.SWARM_SSH_PORT || '1923' }} -H $(cd ../terraform && terraform output -raw droplet_ip) >> ~/.ssh/known_hosts 2>/dev/null || true
+          DROPLET_IP=$(cd terraform && terraform output -raw droplet_ip)
+          ssh-keyscan -p ${{ secrets.SWARM_SSH_PORT || '1923' }} -H "${DROPLET_IP}" >> ~/.ssh/known_hosts 2>/dev/null || true
 
       - name: Test Ansible connection
         run: ansible all -m ping
