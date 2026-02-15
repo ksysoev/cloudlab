@@ -1,0 +1,23 @@
+---
+# Molecule converge playbook for common role
+- name: Converge
+  hosts: all
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+      changed_when: false
+
+    - name: Create deployer user for testing
+      ansible.builtin.user:
+        name: deployer
+        groups: users
+        shell: /bin/bash
+        create_home: true
+
+  roles:
+    - role: common

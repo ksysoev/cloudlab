@@ -4,22 +4,26 @@ Infrastructure as Code for provisioning Docker Swarm on DigitalOcean.
 
 ## Overview
 
-CloudLab provides Terraform configuration for provisioning a secure, production-ready Docker Swarm cluster on DigitalOcean. It includes:
+CloudLab provides a complete infrastructure solution for running Docker Swarm on DigitalOcean with proper configuration management. It uses a two-layer approach:
 
-- **Terraform** configuration for infrastructure provisioning
+- **Terraform** for infrastructure provisioning (droplet, networking, SSH keys)
+- **Ansible** for OS and service configuration (Docker, monitoring, security)
 - **Docker Swarm** single-node cluster (easily scalable)
 - **Grafana Alloy** for logs and metrics collection
 - **Security hardening** with firewall, SSH configuration, and best practices
-- **Complete documentation** for setup and usage
+- **Complete automation** via GitHub Actions CI/CD
 
 ## Features
 
 - **Cost-effective:** ~$12/month for a production-ready swarm cluster
 - **Production-ready:** Hardened security configuration out of the box
-- **Infrastructure as Code:** Reproducible, version-controlled infrastructure
+- **Infrastructure as Code:** Terraform for infrastructure, Ansible for configuration
+- **Stateful deployments:** Changes don't recreate the droplet (preserves data)
+- **Idempotent configuration:** Safe to run repeatedly, only changes what's needed
 - **Monitoring:** Built-in Grafana Alloy for observability
 - **Scalable:** Start with one node, scale to multi-node cluster
 - **Secure:** Non-standard SSH port, firewall rules, key authentication
+- **Fully automated:** GitHub Actions runs Terraform and Ansible on every push
 
 ## Quick Start
 
@@ -32,12 +36,30 @@ cd cloudlab
 
 ### 2. Configure GitHub Secrets
 
-This repository needs two secrets for GitHub Actions to work:
+This repository needs several secrets for GitHub Actions to work:
 
-1. Go to **Settings → Secrets and variables → Actions**
-2. Add these repository secrets:
+1. Go to **Settings → Secrets and variables → Actions → New repository secret**
+2. Add these secrets:
+
+   **Required:**
    - `TF_API_TOKEN` - Your Terraform Cloud API token
-   - `DO_TOKEN` - Your DigitalOcean API token
+   - `SSH_PRIVATE_KEY` - Your SSH private key for connecting to the droplet
+
+   **Optional (with defaults):**
+   - `SWARM_USER` - SSH user (default: `deployer`)
+   - `SWARM_SSH_PORT` - SSH port (default: `1923`)
+
+   **Optional (for monitoring):**
+   - `GRAFANA_CLOUD_LOGS_URL` - Grafana Cloud Loki endpoint
+   - `GRAFANA_CLOUD_LOGS_ID` - Grafana Cloud Loki instance ID
+   - `GRAFANA_CLOUD_METRICS_URL` - Grafana Cloud Prometheus endpoint
+   - `GRAFANA_CLOUD_METRICS_ID` - Grafana Cloud Prometheus instance ID
+   - `GRAFANA_CLOUD_API_KEY` - Grafana Cloud API key
+
+   **Note:** You also need to configure Terraform Cloud workspace variables:
+   - `do_token` (sensitive) - Your DigitalOcean API token
+   - `ssh_public_key` - Your SSH public key content
+   - See `terraform/terraform.tfvars.example` for all available variables
 
 ### 3. Set up infrastructure
 
@@ -103,20 +125,48 @@ Your infrastructure is now ready! Deploy workloads using `docker stack deploy` o
 │                                                             │
 │  Firewall: SSH (1923), HTTP (80), HTTPS (443), Custom (8081)  │
 └─────────────────────────────────────────────────────────────┘
-                           │
-                           │ Terraform
-                           ▼
-              ┌────────────────────────┐
-              │   Infrastructure Setup │
-              │    (Provisioning)      │
-              └────────────────────────┘
+                           │                    │
+                  Terraform │                    │ Ansible
+                  (infra)   │                    │ (config)
+                           ▼                    ▼
+              ┌────────────────────┐  ┌────────────────────┐
+              │   Provision        │  │   Configure        │
+              │   - Droplet        │  │   - Docker         │
+              │   - SSH Keys       │  │   - Security       │
+              │   - Firewall       │  │   - Monitoring     │
+              └────────────────────┘  └────────────────────┘
+                           │                    │
+                           └────────┬───────────┘
+                                    │
+                           GitHub Actions CI/CD
 ```
+
+### Two-Layer Approach
+
+**Layer 1: Infrastructure (Terraform)**
+- Creates the droplet with minimal cloud-init
+- Configures networking and firewall
+- Manages SSH keys
+- **Result:** A bare Ubuntu server ready for configuration
+
+**Layer 2: Configuration (Ansible)**
+- Installs and configures Docker + Swarm
+- Sets up security (UFW, fail2ban, SSH hardening)
+- Deploys Grafana Alloy monitoring
+- Creates directory structure
+- **Result:** A fully configured, production-ready server
+
+**Benefits:**
+- Changes to configuration don't recreate the droplet
+- Safe for stateful workloads (databases, volumes persist)
+- Idempotent - can run configuration multiple times safely
+- Fast updates - only changes what's needed
 
 ## Repository Structure
 
 ```
 cloudlab/
-├── terraform/              # Infrastructure as Code
+├── terraform/              # Infrastructure provisioning (Terraform)
 │   ├── providers.tf        # Terraform & provider config
 │   ├── variables.tf        # Input variables
 │   ├── outputs.tf          # Output values
@@ -124,19 +174,28 @@ cloudlab/
 │   ├── firewall.tf         # Firewall rules
 │   ├── ssh.tf              # SSH key management
 │   ├── main.tf             # Main configuration
-│   ├── cloud-init.yaml     # Droplet initialization script
+│   ├── cloud-init.yaml     # Minimal bootstrap (Python + SSH)
 │   └── terraform.tfvars.example
 │
-├── scripts/                # Helper scripts
-│   ├── init-swarm.sh       # Initialize Docker Swarm
-│   └── deploy-alloy.sh     # Deploy Grafana Alloy
+├── ansible/                # Configuration management (Ansible)
+│   ├── ansible.cfg         # Ansible configuration
+│   ├── inventory/
+│   │   └── production.py   # Dynamic inventory from Terraform
+│   ├── group_vars/
+│   │   └── all.yml         # Default variables
+│   ├── playbooks/
+│   │   └── site.yml        # Main playbook
+│   ├── roles/
+│   │   ├── common/         # Base system setup
+│   │   ├── security/       # Firewall, SSH hardening
+│   │   ├── docker/         # Docker + Swarm
+│   │   └── monitoring/     # Grafana Alloy
+│   └── README.md           # Ansible documentation
 │
-├── alloy/                  # Grafana Alloy configuration
-│   ├── docker-compose.yml  # Alloy service definition
-│   └── config.alloy        # Alloy configuration
-│
-├── .github/workflows/      # GitHub Actions workflows
-│   └── provision.yml       # Infrastructure provisioning
+├── .github/workflows/      # CI/CD automation
+│   ├── provision.yml       # Terraform (infrastructure)
+│   ├── configure.yml       # Ansible (configuration)
+│   └── test.yml            # Terraform validation
 │
 └── docs/                   # Documentation
     ├── SETUP.md            # Setup guide
@@ -157,13 +216,14 @@ cloudlab/
 ## Technology Stack
 
 - **Cloud Provider:** DigitalOcean
-- **IaC Tool:** Terraform with Terraform Cloud backend
+- **Infrastructure as Code:** Terraform with Terraform Cloud backend
+- **Configuration Management:** Ansible
 - **OS:** Ubuntu 24.04 LTS
 - **Container Orchestration:** Docker Swarm
 - **CI/CD:** GitHub Actions
 - **Container Registry:** GitHub Container Registry (GHCR)
 - **Monitoring:** Grafana Alloy → Grafana Cloud
-- **Automation:** Cloud-init, Bash scripts
+- **Automation:** Cloud-init (bootstrap only), Ansible (full config)
 
 ## Cost Breakdown
 

@@ -1,0 +1,18 @@
+---
+# Molecule prepare playbook for monitoring role
+- name: Prepare
+  hosts: all
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Install gnupg for GPG key handling
+      ansible.builtin.apt:
+        name: gnupg
+        state: present
+        update_cache: true
+
+    - name: Create docker group (required for alloy user)
+      ansible.builtin.group:
+        name: docker
+        state: present

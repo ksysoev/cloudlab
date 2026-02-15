@@ -7,15 +7,10 @@ resource "digitalocean_droplet" "swarm_manager" {
 
   ssh_keys = [digitalocean_ssh_key.cloudlab.id]
 
-  # User data for initial setup
+  # User data for bootstrap only (Ansible handles the rest)
   user_data = templatefile("${path.module}/cloud-init.yaml", {
-    deployer_ssh_key          = var.ssh_public_key
-    ssh_port                  = var.ssh_port
-    grafana_cloud_logs_url    = var.grafana_cloud_logs_url
-    grafana_cloud_logs_id     = var.grafana_cloud_logs_id
-    grafana_cloud_metrics_url = var.grafana_cloud_metrics_url
-    grafana_cloud_metrics_id  = var.grafana_cloud_metrics_id
-    grafana_cloud_api_key     = var.grafana_cloud_api_key
+    deployer_ssh_key = var.ssh_public_key
+    ssh_port         = var.ssh_port
   })
 
   tags = var.tags

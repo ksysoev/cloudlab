@@ -1,0 +1,60 @@
+---
+# Security role - UFW, fail2ban, SSH hardening
+# Translates from cloud-init.yaml lines 44-54, 216-243
+
+- name: Set UFW default policies
+  community.general.ufw:
+    direction: "{{ item.direction }}"
+    policy: "{{ item.policy }}"
+  loop:
+    - {direction: 'incoming', policy: 'deny'}
+    - {direction: 'outgoing', policy: 'allow'}
+
+- name: Allow TCP ports through UFW
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+    comment: "{{ item }} TCP"
+  loop: "{{ firewall_allowed_tcp_ports }}"
+
+- name: Allow UDP ports through UFW
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: udp
+    comment: "{{ item }} UDP"
+  loop: "{{ firewall_allowed_udp_ports }}"
+
+- name: Enable UFW
+  community.general.ufw:
+    state: enabled
+
+- name: Create fail2ban jail configuration
+  ansible.builtin.template:
+    src: jail.local.j2
+    dest: /etc/fail2ban/jail.local
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart fail2ban
+
+- name: Enable and start fail2ban
+  ansible.builtin.systemd:
+    name: fail2ban
+    enabled: true
+    state: started
+
+- name: Remove cloud-init SSH bootstrap configuration
+  ansible.builtin.file:
+    path: /etc/ssh/sshd_config.d/bootstrap.conf
+    state: absent
+
+- name: Create SSH hardening configuration
+  ansible.builtin.template:
+    src: sshd_custom.conf.j2
+    dest: /etc/ssh/sshd_config.d/custom_port.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart ssh

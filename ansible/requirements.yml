@@ -1,0 +1,5 @@
+---
+# Ansible Galaxy requirements
+collections:
+  - name: community.general
+    version: ">=7.0.0,<12.0.0"

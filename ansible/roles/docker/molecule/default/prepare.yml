@@ -1,0 +1,19 @@
+---
+# Molecule prepare playbook for docker role
+- name: Prepare
+  hosts: all
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Install gnupg for GPG key handling
+      ansible.builtin.apt:
+        name: gnupg
+        state: present
+        update_cache: true
+
+    - name: Create deployer user for testing
+      ansible.builtin.user:
+        name: deployer
+        state: present
+        create_home: true

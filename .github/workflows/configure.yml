@@ -1,0 +1,130 @@
+name: Configure Server
+
+on:
+  workflow_dispatch: {}
+  workflow_run:
+    workflows: ["Provision Infrastructure"]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  ANSIBLE_VERSION: '2.15.0'
+  ANSIBLE_WORKING_DIR: './ansible'
+
+jobs:
+  configure:
+    name: Configure with Ansible
+    runs-on: ubuntu-latest
+    
+    # Only run if Provision Infrastructure workflow succeeded, or on manual trigger
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    
+    environment: production
+    
+    defaults:
+      run:
+        working-directory: ${{ env.ANSIBLE_WORKING_DIR }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Ansible and dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ansible==${{ env.ANSIBLE_VERSION }}
+          ansible-galaxy collection install -r requirements.yml
+
+      - name: Setup Terraform for dynamic inventory
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.9.0'
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+          terraform_wrapper: false
+
+      - name: Initialize Terraform (for inventory)
+        run: terraform init
+        working-directory: ./terraform
+
+      - name: Wait for droplet SSH after reboot
+        run: |
+          DROPLET_IP=$(cd terraform && terraform output -raw droplet_ip)
+          SSH_PORT="${{ secrets.SWARM_SSH_PORT || '1923' }}"
+          echo "Waiting for SSH on ${DROPLET_IP}:${SSH_PORT}..."
+          for i in {1..30}; do
+            if nc -z -w 5 "${DROPLET_IP}" "${SSH_PORT}" 2>/dev/null; then
+              echo "SSH port is open on ${DROPLET_IP}:${SSH_PORT}"
+              sleep 5  # Wait a bit more for SSH service to be fully ready
+              exit 0
+            fi
+            echo "SSH not ready yet, retrying in 10 seconds... (attempt ${i}/30)"
+            sleep 10
+          done
+          echo "SSH did not become available within the expected time."
+          exit 1
+
+      - name: Configure SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          DROPLET_IP=$(cd terraform && terraform output -raw droplet_ip)
+          ssh-keyscan -p ${{ secrets.SWARM_SSH_PORT || '1923' }} -H "${DROPLET_IP}" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Test Ansible connection
+        run: ansible all -m ping
+
+      - name: Run Ansible playbook (check mode)
+        run: |
+          ansible-playbook playbooks/site.yml --check --diff \
+            -e "ansible_user=${{ secrets.SWARM_USER || 'deployer' }}" \
+            -e "ansible_ssh_port=${{ secrets.SWARM_SSH_PORT || '1923' }}" \
+            -e "ssh_port=${{ secrets.SWARM_SSH_PORT || '1923' }}" \
+            -e "grafana_cloud_logs_url=${GRAFANA_CLOUD_LOGS_URL}" \
+            -e "grafana_cloud_logs_id=${GRAFANA_CLOUD_LOGS_ID}" \
+            -e "grafana_cloud_metrics_url=${GRAFANA_CLOUD_METRICS_URL}" \
+            -e "grafana_cloud_metrics_id=${GRAFANA_CLOUD_METRICS_ID}" \
+            -e "grafana_cloud_api_key=${GRAFANA_CLOUD_API_KEY}"
+        env:
+          GRAFANA_CLOUD_LOGS_URL: ${{ secrets.GRAFANA_CLOUD_LOGS_URL }}
+          GRAFANA_CLOUD_LOGS_ID: ${{ secrets.GRAFANA_CLOUD_LOGS_ID }}
+          GRAFANA_CLOUD_METRICS_URL: ${{ secrets.GRAFANA_CLOUD_METRICS_URL }}
+          GRAFANA_CLOUD_METRICS_ID: ${{ secrets.GRAFANA_CLOUD_METRICS_ID }}
+          GRAFANA_CLOUD_API_KEY: ${{ secrets.GRAFANA_CLOUD_API_KEY }}
+        continue-on-error: true
+
+      - name: Run Ansible playbook
+        run: |
+          ansible-playbook playbooks/site.yml \
+            -e "ansible_user=${{ secrets.SWARM_USER || 'deployer' }}" \
+            -e "ansible_ssh_port=${{ secrets.SWARM_SSH_PORT || '1923' }}" \
+            -e "ssh_port=${{ secrets.SWARM_SSH_PORT || '1923' }}" \
+            -e "grafana_cloud_logs_url=${GRAFANA_CLOUD_LOGS_URL}" \
+            -e "grafana_cloud_logs_id=${GRAFANA_CLOUD_LOGS_ID}" \
+            -e "grafana_cloud_metrics_url=${GRAFANA_CLOUD_METRICS_URL}" \
+            -e "grafana_cloud_metrics_id=${GRAFANA_CLOUD_METRICS_ID}" \
+            -e "grafana_cloud_api_key=${GRAFANA_CLOUD_API_KEY}"
+        env:
+          GRAFANA_CLOUD_LOGS_URL: ${{ secrets.GRAFANA_CLOUD_LOGS_URL }}
+          GRAFANA_CLOUD_LOGS_ID: ${{ secrets.GRAFANA_CLOUD_LOGS_ID }}
+          GRAFANA_CLOUD_METRICS_URL: ${{ secrets.GRAFANA_CLOUD_METRICS_URL }}
+          GRAFANA_CLOUD_METRICS_ID: ${{ secrets.GRAFANA_CLOUD_METRICS_ID }}
+          GRAFANA_CLOUD_API_KEY: ${{ secrets.GRAFANA_CLOUD_API_KEY }}
+
+      - name: Verify services
+        run: |
+          ansible all -m shell -a "systemctl is-active docker"
+          ansible all -m shell -a "systemctl is-active alloy"
+          ansible all -m shell -a "docker info | grep 'Swarm: active'"

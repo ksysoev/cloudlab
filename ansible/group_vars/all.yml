@@ -1,0 +1,54 @@
+---
+# Connection settings
+ansible_user: deployer
+ansible_ssh_port: 1923
+
+# SSH hardening
+ssh_port: 1923
+
+# System packages
+base_packages:
+  - apt-transport-https
+  - ca-certificates
+  - curl
+  - gnupg
+  - lsb-release
+  - unattended-upgrades
+  - fail2ban
+  - ufw
+  - jq
+
+# Fail2ban
+fail2ban_maxretry: 5
+fail2ban_bantime: 3600
+
+# Firewall ports
+firewall_allowed_tcp_ports:
+  - "{{ ssh_port }}"
+  - "80"
+  - "443"
+  - "8081"
+firewall_allowed_udp_ports:
+  - "443"
+
+# Docker
+docker_log_max_size: "10m"
+docker_log_max_file: "3"
+docker_metrics_addr: "127.0.0.1:9323"
+
+# Docker Swarm
+swarm_instance_name: "cloudlab-swarm"
+swarm_overlay_network: "cloudlab-public"
+
+# Cloudlab directories
+cloudlab_base_dir: /opt/cloudlab
+cloudlab_dirs:
+  - "{{ cloudlab_base_dir }}/scripts"
+  - "{{ cloudlab_base_dir }}/stacks"
+
+# Grafana Alloy (overridden by CI/CD secrets)
+grafana_cloud_logs_url: ""
+grafana_cloud_logs_id: ""
+grafana_cloud_metrics_url: ""
+grafana_cloud_metrics_id: ""
+grafana_cloud_api_key: ""
