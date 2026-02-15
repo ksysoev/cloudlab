@@ -16,7 +16,9 @@
 
 - name: Add Grafana repository
   ansible.builtin.apt_repository:
-    repo: "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main"
+    repo: >-
+      deb [signed-by=/etc/apt/keyrings/grafana.gpg]
+      https://apt.grafana.com stable main
     state: present
     filename: grafana
 

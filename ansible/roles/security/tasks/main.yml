@@ -5,14 +5,14 @@
 - name: Reset UFW to defaults
   community.general.ufw:
     state: reset
-  
+
 - name: Set UFW default policies
   community.general.ufw:
     direction: "{{ item.direction }}"
     policy: "{{ item.policy }}"
   loop:
-    - { direction: 'incoming', policy: 'deny' }
-    - { direction: 'outgoing', policy: 'allow' }
+    - {direction: 'incoming', policy: 'deny'}
+    - {direction: 'outgoing', policy: 'allow'}
 
 - name: Allow TCP ports through UFW
   community.general.ufw:
