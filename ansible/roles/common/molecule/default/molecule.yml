@@ -23,6 +23,7 @@ provisioner:
   config_options:
     defaults:
       callbacks_enabled: profile_tasks,timer,yaml
+      roles_path: ../../../
   inventory:
     group_vars:
       all:
