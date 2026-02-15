@@ -90,6 +90,7 @@ jobs:
       - name: Run Ansible playbook (check mode)
         run: |
           ansible-playbook playbooks/site.yml --check --diff \
+            -e "@group_vars/all.yml" \
             -e "ansible_user=${{ secrets.SWARM_USER || 'deployer' }}" \
             -e "ansible_ssh_port=${{ secrets.SWARM_SSH_PORT || '1923' }}" \
             -e "ssh_port=${{ secrets.SWARM_SSH_PORT || '1923' }}" \
@@ -109,6 +110,7 @@ jobs:
       - name: Run Ansible playbook
         run: |
           ansible-playbook playbooks/site.yml \
+            -e "@group_vars/all.yml" \
             -e "ansible_user=${{ secrets.SWARM_USER || 'deployer' }}" \
             -e "ansible_ssh_port=${{ secrets.SWARM_SSH_PORT || '1923' }}" \
             -e "ssh_port=${{ secrets.SWARM_SSH_PORT || '1923' }}" \
