@@ -53,7 +53,7 @@ write_files:
       bantime = 3600
 
   # Grafana Alloy configuration template
-  - path: /tmp/alloy-config.alloy
+  - path: /opt/cloudlab/alloy/config.alloy
     permissions: '0644'
     content: |
       // Grafana Alloy Configuration
@@ -125,7 +125,7 @@ write_files:
           container_name: grafana-alloy
           restart: unless-stopped
           volumes:
-            - /tmp/alloy-config.alloy:/etc/alloy/config.alloy:ro
+            - /opt/cloudlab/alloy/config.alloy:/etc/alloy/config.alloy:ro
             - /var/run/docker.sock:/var/run/docker.sock:ro
             - /var/log:/var/log:ro
             - /:/rootfs:ro
