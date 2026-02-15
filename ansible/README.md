@@ -22,7 +22,7 @@ ansible/
 
 ## Requirements
 
-- Ansible >= 2.15.0
+- Ansible >= 8.0.0 (includes ansible-core >= 2.15.0)
 - Python 3
 - Terraform (for dynamic inventory)
 - SSH access to the droplet

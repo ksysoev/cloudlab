@@ -1,7 +1,9 @@
 # Ansible Runtime Requirements
 # Install with: pip install -r requirements.txt
 
-ansible>=2.15.0,<3.0
+# Ansible 8.x includes ansible-core 2.15.x
+# Ansible 9.x includes ansible-core 2.16.x
+ansible>=8.0.0,<10.0.0
 
 # Required collections will be installed via ansible-galaxy
 # See: ansible-galaxy collection install -r requirements.yml
