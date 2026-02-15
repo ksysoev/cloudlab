@@ -11,13 +11,13 @@
   roles:
     - role: common
       tags: [common, base]
-      
+
     - role: security
       tags: [security, firewall, ssh]
-      
+
     - role: docker
       tags: [docker, swarm]
-      
+
     - role: monitoring
       tags: [monitoring, alloy]
 
@@ -30,4 +30,6 @@
           - "Public IP: {{ ansible_host }}"
           - "SSH Port: {{ ssh_port }}"
           - "Docker Swarm: Active"
-          - "Grafana Alloy: {{ 'Configured' if grafana_cloud_logs_url != '' else 'Local mode' }}"
+          - >-
+            Grafana Alloy: {{ 'Configured'
+            if grafana_cloud_logs_url != '' else 'Local mode' }}

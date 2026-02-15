@@ -1,3 +1,4 @@
+---
 # Connection settings
 ansible_user: deployer
 ansible_ssh_port: 1923
