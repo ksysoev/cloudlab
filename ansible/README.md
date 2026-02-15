@@ -88,6 +88,27 @@ Variables are defined in `group_vars/all.yml`. Override them via:
 
 The playbook is automatically run by GitHub Actions after Terraform provisions infrastructure. See `.github/workflows/configure.yml`.
 
+### Required GitHub Secrets
+
+The workflow needs these secrets configured in your repository:
+
+**Required:**
+- `TF_API_TOKEN` - Terraform Cloud API token (for dynamic inventory)
+- `SSH_PRIVATE_KEY` - SSH private key to connect to the droplet
+
+**Optional (with defaults):**
+- `SWARM_USER` - SSH username (default: `deployer`)
+- `SWARM_SSH_PORT` - SSH port (default: `1923`)
+
+**Optional (for monitoring):**
+- `GRAFANA_CLOUD_LOGS_URL` - Grafana Cloud Loki push endpoint
+- `GRAFANA_CLOUD_LOGS_ID` - Loki instance ID
+- `GRAFANA_CLOUD_METRICS_URL` - Grafana Cloud Prometheus push endpoint
+- `GRAFANA_CLOUD_METRICS_ID` - Prometheus instance ID
+- `GRAFANA_CLOUD_API_KEY` - Grafana Cloud API key
+
+These secrets are passed as extra vars to the playbook during CI/CD runs.
+
 ## Migration from cloud-init
 
 This Ansible configuration replaces the monolithic `terraform/cloud-init.yaml`. The main benefits:

@@ -69,13 +69,22 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -p 1923 -H $(cd ../terraform && terraform output -raw droplet_ip) >> ~/.ssh/known_hosts 2>/dev/null || true
+          ssh-keyscan -p ${{ secrets.SWARM_SSH_PORT || '1923' }} -H $(cd ../terraform && terraform output -raw droplet_ip) >> ~/.ssh/known_hosts 2>/dev/null || true
 
       - name: Test Ansible connection
         run: ansible all -m ping
 
       - name: Run Ansible playbook (check mode)
-        run: ansible-playbook playbooks/site.yml --check --diff
+        run: |
+          ansible-playbook playbooks/site.yml --check --diff \
+            -e "ansible_user=${{ secrets.SWARM_USER || 'deployer' }}" \
+            -e "ansible_ssh_port=${{ secrets.SWARM_SSH_PORT || '1923' }}" \
+            -e "ssh_port=${{ secrets.SWARM_SSH_PORT || '1923' }}" \
+            -e "grafana_cloud_logs_url=${GRAFANA_CLOUD_LOGS_URL}" \
+            -e "grafana_cloud_logs_id=${GRAFANA_CLOUD_LOGS_ID}" \
+            -e "grafana_cloud_metrics_url=${GRAFANA_CLOUD_METRICS_URL}" \
+            -e "grafana_cloud_metrics_id=${GRAFANA_CLOUD_METRICS_ID}" \
+            -e "grafana_cloud_api_key=${GRAFANA_CLOUD_API_KEY}"
         env:
           GRAFANA_CLOUD_LOGS_URL: ${{ secrets.GRAFANA_CLOUD_LOGS_URL }}
           GRAFANA_CLOUD_LOGS_ID: ${{ secrets.GRAFANA_CLOUD_LOGS_ID }}
@@ -87,6 +96,9 @@ jobs:
       - name: Run Ansible playbook
         run: |
           ansible-playbook playbooks/site.yml \
+            -e "ansible_user=${{ secrets.SWARM_USER || 'deployer' }}" \
+            -e "ansible_ssh_port=${{ secrets.SWARM_SSH_PORT || '1923' }}" \
+            -e "ssh_port=${{ secrets.SWARM_SSH_PORT || '1923' }}" \
             -e "grafana_cloud_logs_url=${GRAFANA_CLOUD_LOGS_URL}" \
             -e "grafana_cloud_logs_id=${GRAFANA_CLOUD_LOGS_ID}" \
             -e "grafana_cloud_metrics_url=${GRAFANA_CLOUD_METRICS_URL}" \

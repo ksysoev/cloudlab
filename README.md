@@ -40,13 +40,26 @@ This repository needs several secrets for GitHub Actions to work:
 
 1. Go to **Settings → Secrets and variables → Actions → New repository secret**
 2. Add these secrets:
+
+   **Required:**
    - `TF_API_TOKEN` - Your Terraform Cloud API token
-   - `SSH_PRIVATE_KEY` - Your SSH private key for the deployer user
-   - `GRAFANA_CLOUD_LOGS_URL` - Grafana Cloud Loki endpoint (optional)
-   - `GRAFANA_CLOUD_LOGS_ID` - Grafana Cloud Loki instance ID (optional)
-   - `GRAFANA_CLOUD_METRICS_URL` - Grafana Cloud Prometheus endpoint (optional)
-   - `GRAFANA_CLOUD_METRICS_ID` - Grafana Cloud Prometheus instance ID (optional)
-   - `GRAFANA_CLOUD_API_KEY` - Grafana Cloud API key (optional)
+   - `SSH_PRIVATE_KEY` - Your SSH private key for connecting to the droplet
+
+   **Optional (with defaults):**
+   - `SWARM_USER` - SSH user (default: `deployer`)
+   - `SWARM_SSH_PORT` - SSH port (default: `1923`)
+
+   **Optional (for monitoring):**
+   - `GRAFANA_CLOUD_LOGS_URL` - Grafana Cloud Loki endpoint
+   - `GRAFANA_CLOUD_LOGS_ID` - Grafana Cloud Loki instance ID
+   - `GRAFANA_CLOUD_METRICS_URL` - Grafana Cloud Prometheus endpoint
+   - `GRAFANA_CLOUD_METRICS_ID` - Grafana Cloud Prometheus instance ID
+   - `GRAFANA_CLOUD_API_KEY` - Grafana Cloud API key
+
+   **Note:** You also need to configure Terraform Cloud workspace variables:
+   - `do_token` (sensitive) - Your DigitalOcean API token
+   - `ssh_public_key` - Your SSH public key content
+   - See `terraform/terraform.tfvars.example` for all available variables
 
 ### 3. Set up infrastructure
 
