@@ -8,8 +8,8 @@ on:
   push:
     branches:
       - main
-    paths:
       - 'terraform/**'
+      - 'ansible/**'
       - '.github/workflows/provision.yml'
   workflow_dispatch:
     inputs:
