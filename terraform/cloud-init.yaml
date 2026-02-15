@@ -282,6 +282,13 @@ runcmd:
   - apt-get update
   - apt-get install -y alloy
 
+  # Create alloy user and configure environment
+  - useradd --system --no-create-home --shell /usr/sbin/nologin alloy || true
+  - usermod -aG docker alloy
+  - mkdir -p /var/lib/alloy/data
+  - chown -R alloy:alloy /var/lib/alloy
+  - cp /etc/default/alloy.dpkg-new /etc/default/alloy || echo 'CONFIG_FILE="/etc/alloy/config.alloy"' > /etc/default/alloy
+
   # Enable and start Alloy service
   - systemctl daemon-reload
   - systemctl enable alloy
