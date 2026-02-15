@@ -15,12 +15,13 @@ packages:
   - ufw
   - jq
 
-# Preserve default root user and create the deployer user for GitHub Actions deployments
+# Preserve default root user but disable SSH login, create deployer user for all operations
 users:
   - default
   - name: deployer
     sudo: ['ALL=(ALL) NOPASSWD:ALL']
     shell: /bin/bash
+    groups: users, admin
     ssh_authorized_keys:
       - ${deployer_ssh_key}
 
@@ -227,9 +228,11 @@ runcmd:
   - ufw allow 8081/tcp comment 'Custom application port'
   - ufw --force enable
 
-  # Change SSH port to ${ssh_port} and restart (after UFW allows the new port)
+  # Change SSH port to ${ssh_port}, disable root login, and restart (after UFW allows the new port)
   - mkdir -p /etc/ssh/sshd_config.d
   - echo "Port ${ssh_port}" > /etc/ssh/sshd_config.d/custom_port.conf
+  - echo "PermitRootLogin no" >> /etc/ssh/sshd_config.d/custom_port.conf
+  - echo "PasswordAuthentication no" >> /etc/ssh/sshd_config.d/custom_port.conf
   - systemctl restart ssh
 
   # Remove temporary port 22 rule now that SSH is on the custom port

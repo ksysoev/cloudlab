@@ -64,8 +64,8 @@ After Terraform completes, test SSH access:
 # Get the droplet IP from outputs
 terraform output droplet_ip
 
-# Connect to the droplet
-ssh -p 1923 root@<droplet-ip>
+# Connect to the droplet (using deployer user - root SSH is disabled for security)
+ssh -p 1923 deployer@<droplet-ip>
 
 # Verify Docker Swarm
 docker node ls
@@ -223,6 +223,7 @@ Or integrate with your preferred CI/CD pipeline.
 
 - **Non-Standard SSH Port:** SSH runs on port 1923 (not 22)
 - **SSH Key Authentication:** No password authentication
+- **Root SSH Disabled:** Only the deployer user can SSH in (with sudo access)
 - **Firewall:** Only ports 1923, 80, 443, 8081 (TCP) and 443 (UDP) exposed
 - **Ubuntu 24.04 LTS:** Latest LTS release with automatic security updates
 - **Secrets Management:** GitHub Secrets + Docker Secrets
