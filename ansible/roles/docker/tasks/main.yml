@@ -76,10 +76,14 @@
     url: http://169.254.169.254/metadata/v1/interfaces/public/0/ipv4/address
     return_content: true
   register: docker_public_ip_result
+  tags:
+    - molecule-notest
 
 - name: Set public IP fact
   ansible.builtin.set_fact:
     docker_droplet_public_ip: "{{ docker_public_ip_result.content | trim }}"
+  tags:
+    - molecule-notest
 
 - name: Check if Docker Swarm is already initialized
   ansible.builtin.shell: |
@@ -90,6 +94,8 @@
   register: docker_swarm_status
   changed_when: false
   failed_when: false
+  tags:
+    - molecule-notest
 
 - name: Initialize Docker Swarm
   ansible.builtin.command: >-
@@ -97,6 +103,8 @@
   when: docker_swarm_status.rc != 0
   register: docker_swarm_init
   changed_when: docker_swarm_init.rc == 0
+  tags:
+    - molecule-notest
 
 - name: Create overlay network for applications
   ansible.builtin.command: >-
@@ -108,3 +116,5 @@
     - docker_network_create.rc != 0
     - "'already exists' not in docker_network_create.stderr"
   changed_when: docker_network_create.rc == 0
+  tags:
+    - molecule-notest
