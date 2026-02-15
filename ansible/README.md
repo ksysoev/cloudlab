@@ -23,11 +23,36 @@ ansible/
 ## Requirements
 
 - Ansible >= 8.0.0 (includes ansible-core >= 2.15.0)
-- Python 3
+- Python 3.9+
 - Terraform (for dynamic inventory)
 - SSH access to the droplet
 
-Install required dependencies:
+### Installation
+
+This project uses [Poetry](https://python-poetry.org/) for dependency management, which provides lock file support for reproducible builds and Dependabot compatibility.
+
+Install Poetry:
+```bash
+curl -sSL https://install.python-poetry.org | python3 -
+```
+
+Install dependencies:
+```bash
+# Install all dependencies (including test dependencies)
+poetry install
+
+# Install production dependencies only
+poetry install --only main
+
+# Install Ansible Galaxy collections
+ansible-galaxy install -r requirements.yml
+```
+
+**Note:** CI/CD workflows currently use pip with `requirements.txt` files for simplicity and faster execution. The `poetry.lock` file is primarily for local development reproducibility and Dependabot vulnerability tracking.
+
+### Legacy Installation (pip)
+
+Alternatively, you can use pip with requirements.txt files:
 ```bash
 # Install Ansible and runtime requirements
 pip install -r requirements.txt
@@ -36,14 +61,24 @@ pip install -r requirements.txt
 ansible-galaxy install -r requirements.yml
 ```
 
-### Development Requirements
-
 For testing and development:
 ```bash
 pip install -r requirements-test.txt
 ```
 
 ## Usage
+
+### Activate Poetry environment
+
+If using Poetry, activate the virtual environment:
+```bash
+poetry shell
+```
+
+Or run commands directly with Poetry:
+```bash
+poetry run ansible-playbook playbooks/site.yml
+```
 
 ### Run full configuration
 ```bash
