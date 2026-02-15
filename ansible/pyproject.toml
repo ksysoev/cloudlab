@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "cloudlab-ansible"
+version = "1.0.0"
+description = "Ansible playbooks and roles for CloudLab infrastructure"
+authors = ["CloudLab Team"]
+readme = "README.md"
+packages = []
+
+[tool.poetry.dependencies]
+python = "^3.9"
+ansible = ">=8.0.0,<10.0.0"
+
+[tool.poetry.group.test.dependencies]
+ansible-core = ">=2.15.0,<2.18.0"
+ansible-lint = ">=6.0.0"
+molecule = ">=6.0.0"
+molecule-plugins = {extras = ["docker"], version = ">=23.5.0"}
+pytest = ">=7.0.0"
+pytest-testinfra = ">=9.0.0"
+pytest-xdist = ">=3.0.0"
+docker = ">=6.0.0"
+yamllint = ">=1.32.0"
+jmespath = ">=1.0.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
