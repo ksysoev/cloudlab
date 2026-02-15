@@ -58,6 +58,7 @@ jobs:
         working-directory: ./terraform
 
       - name: Wait for droplet SSH after reboot
+        working-directory: .
         run: |
           DROPLET_IP=$(cd terraform && terraform output -raw droplet_ip)
           SSH_PORT="${{ secrets.SWARM_SSH_PORT || '1923' }}"
@@ -75,6 +76,7 @@ jobs:
           exit 1
 
       - name: Configure SSH key
+        working-directory: .
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
