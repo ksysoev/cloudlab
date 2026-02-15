@@ -1,0 +1,78 @@
+---
+# Monitoring role - Grafana Alloy installation and configuration
+# Translates from cloud-init.yaml lines 56-186, 279-298
+
+- name: Create Grafana APT keyrings directory
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
+
+- name: Add Grafana GPG key
+  ansible.builtin.apt_key:
+    url: https://apt.grafana.com/gpg.key
+    keyring: /etc/apt/keyrings/grafana.gpg
+    state: present
+
+- name: Add Grafana repository
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main"
+    state: present
+    filename: grafana
+
+- name: Update apt cache after adding Grafana repo
+  ansible.builtin.apt:
+    update_cache: true
+
+- name: Install Grafana Alloy
+  ansible.builtin.apt:
+    name: alloy
+    state: present
+
+- name: Create alloy system user
+  ansible.builtin.user:
+    name: alloy
+    system: true
+    create_home: false
+    shell: /usr/sbin/nologin
+    state: present
+
+- name: Add alloy user to docker group
+  ansible.builtin.user:
+    name: alloy
+    groups: docker
+    append: true
+
+- name: Create alloy data directory
+  ansible.builtin.file:
+    path: /var/lib/alloy/data
+    state: directory
+    owner: alloy
+    group: alloy
+    mode: '0755'
+    recurse: true
+
+- name: Template Grafana Alloy configuration
+  ansible.builtin.template:
+    src: config.alloy.j2
+    dest: /etc/alloy/config.alloy
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart alloy
+
+- name: Configure Alloy environment file
+  ansible.builtin.copy:
+    dest: /etc/default/alloy
+    content: |
+      CONFIG_FILE="/etc/alloy/config.alloy"
+    mode: '0644'
+    owner: root
+    group: root
+
+- name: Enable and start Alloy service
+  ansible.builtin.systemd:
+    name: alloy
+    enabled: true
+    state: started
+    daemon_reload: true

@@ -1,5 +1,9 @@
 name: Provision Infrastructure
 
+# This workflow provisions infrastructure using Terraform
+# After successful completion, the Configure Server workflow runs Ansible
+# to configure the OS and services
+
 on:
   push:
     branches:

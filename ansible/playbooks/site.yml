@@ -1,0 +1,33 @@
+---
+# CloudLab Server Configuration Playbook
+# This playbook configures the DigitalOcean droplet with all required services
+# It replaces the cloud-init configuration for idempotent, stateful deployments
+
+- name: Configure CloudLab Swarm Infrastructure
+  hosts: swarm
+  become: true
+  gather_facts: true
+
+  roles:
+    - role: common
+      tags: [common, base]
+      
+    - role: security
+      tags: [security, firewall, ssh]
+      
+    - role: docker
+      tags: [docker, swarm]
+      
+    - role: monitoring
+      tags: [monitoring, alloy]
+
+  post_tasks:
+    - name: Display configuration summary
+      ansible.builtin.debug:
+        msg:
+          - "CloudLab configuration complete!"
+          - "Instance: {{ swarm_instance_name }}"
+          - "Public IP: {{ ansible_host }}"
+          - "SSH Port: {{ ssh_port }}"
+          - "Docker Swarm: Active"
+          - "Grafana Alloy: {{ 'Configured' if grafana_cloud_logs_url != '' else 'Local mode' }}"

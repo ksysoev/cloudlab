@@ -1,21 +1,19 @@
 #cloud-config
+# CloudLab Bootstrap Configuration
+# Minimal cloud-init for initial droplet setup
+# All other configuration is managed by Ansible
 
-# Update and upgrade system packages
+# Update system packages
 package_update: true
 package_upgrade: true
 
+# Install Ansible dependencies only
 packages:
-  - apt-transport-https
-  - ca-certificates
+  - python3
+  - python3-apt
   - curl
-  - gnupg
-  - lsb-release
-  - unattended-upgrades
-  - fail2ban
-  - ufw
-  - jq
 
-# Preserve default root user but disable SSH login, create deployer user for all operations
+# Create deployer user for Ansible to connect
 users:
   - default
   - name: deployer
@@ -25,286 +23,20 @@ users:
     ssh_authorized_keys:
       - ${deployer_ssh_key}
 
-# Write configuration files
-write_files:
-  # Docker daemon configuration (directory created in runcmd before Docker install)
-  - path: /etc/docker/daemon.json
-    permissions: '0644'
-    content: |
-      {
-        "log-driver": "json-file",
-        "log-opts": {
-          "max-size": "10m",
-          "max-file": "3"
-        },
-        "metrics-addr": "127.0.0.1:9323",
-        "experimental": false
-      }
-
-  # Fail2ban SSH jail configuration for custom port
-  - path: /etc/fail2ban/jail.local
-    permissions: '0644'
-    content: |
-      [sshd]
-      enabled = true
-      port = ${ssh_port}
-      filter = sshd
-      logpath = /var/log/auth.log
-      maxretry = 5
-      bantime = 3600
-
-  # Grafana Alloy configuration for systemd service
-  - path: /etc/alloy/config.alloy
-    permissions: '0644'
-    content: |
-      // Grafana Alloy Configuration
-      
-      logging {
-        level  = "info"
-        format = "logfmt"
-      }
-
-      // Grafana Cloud endpoints
-      %{ if grafana_cloud_logs_url != "" }
-      loki.write "grafana_cloud_loki" {
-        endpoint {
-          url = "${grafana_cloud_logs_url}"
-          basic_auth {
-            username = "${grafana_cloud_logs_id}"
-            password = "${grafana_cloud_api_key}"
-          }
-        }
-      }
-      %{ else }
-      loki.write "grafana_cloud_loki" {
-        endpoint {
-          url = "http://localhost:3100/loki/api/v1/push"
-        }
-      }
-      %{ endif }
-
-      %{ if grafana_cloud_metrics_url != "" }
-      prometheus.remote_write "metrics_service" {
-        endpoint {
-          url = "${grafana_cloud_metrics_url}"
-          basic_auth {
-            username = "${grafana_cloud_metrics_id}"
-            password = "${grafana_cloud_api_key}"
-          }
-        }
-      }
-      %{ endif }
-
-      // Node exporter for system metrics
-      prometheus.exporter.unix "integrations_node_exporter" {
-        disable_collectors = ["ipvs", "btrfs", "infiniband", "xfs", "zfs"]
-
-        filesystem {
-          fs_types_exclude     = "^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|tmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs)$"
-          mount_points_exclude = "^/(dev|proc|run/credentials/.+|sys|var/lib/docker/.+)($|/)"
-          mount_timeout        = "5s"
-        }
-
-        netclass {
-          ignored_devices = "^(veth.*|cali.*|[a-f0-9]{15})$"
-        }
-
-        netdev {
-          device_exclude = "^(veth.*|cali.*|[a-f0-9]{15})$"
-        }
-      }
-
-      // Add proper labels to node exporter metrics
-      discovery.relabel "integrations_node_exporter" {
-        targets = prometheus.exporter.unix.integrations_node_exporter.targets
-
-        rule {
-          target_label = "instance"
-          replacement  = "cloudlab-swarm"
-        }
-
-        rule {
-          target_label = "job"
-          replacement = "integrations/node_exporter"
-        }
-      }
-
-      // Scrape node exporter metrics
-      prometheus.scrape "integrations_node_exporter" {
-        targets    = discovery.relabel.integrations_node_exporter.output
-        forward_to = [prometheus.relabel.integrations_node_exporter.receiver]
-      }
-
-      // Filter and forward metrics
-      prometheus.relabel "integrations_node_exporter" {
-        forward_to = [prometheus.remote_write.metrics_service.receiver]
-
-        rule {
-          source_labels = ["__name__"]
-          regex         = "up|node_cpu_seconds_total|node_load1|node_load5|node_load15|node_memory_MemAvailable_bytes|node_memory_MemFree_bytes|node_memory_MemTotal_bytes|node_memory_Cached_bytes|node_memory_Buffers_bytes|node_filesystem_avail_bytes|node_filesystem_size_bytes|node_disk_read_bytes_total|node_disk_written_bytes_total|node_network_receive_bytes_total|node_network_transmit_bytes_total"
-          action        = "keep"
-        }
-      }
-
-      // Docker container logs collection
-      discovery.docker "logs_integrations_docker" {
-        host             = "unix:///var/run/docker.sock"
-        refresh_interval = "5s"
-      }
-
-      discovery.relabel "logs_integrations_docker" {
-        targets = discovery.docker.logs_integrations_docker.targets
-
-        rule {
-          target_label = "job"
-          replacement  = "integrations/docker"
-        }
-
-        rule {
-          target_label = "instance"
-          replacement  = "cloudlab-swarm"
-        }
-
-        rule {
-          source_labels = ["__meta_docker_container_name"]
-          regex         = "/(.*)"
-          target_label  = "container"
-        }
-
-        rule {
-          source_labels = ["__meta_docker_container_log_stream"]
-          target_label  = "stream"
-        }
-      }
-
-      loki.source.docker "logs_integrations_docker" {
-        host             = "unix:///var/run/docker.sock"
-        targets          = discovery.docker.logs_integrations_docker.targets
-        forward_to       = [loki.write.grafana_cloud_loki.receiver]
-        relabel_rules    = discovery.relabel.logs_integrations_docker.rules
-        refresh_interval = "5s"
-      }
-
-  # Init script for Docker Swarm
-  - path: /usr/local/bin/init-swarm.sh
-    permissions: '0755'
-    content: |
-      #!/bin/bash
-      set -e
-
-      echo "Initializing Docker Swarm..."
-      
-      # Get the droplet's public IP
-      PUBLIC_IP=$(curl -s http://169.254.169.254/metadata/v1/interfaces/public/0/ipv4/address)
-      
-      # Initialize swarm if not already initialized
-      if ! docker info | grep -q "Swarm: active"; then
-        docker swarm init --advertise-addr $PUBLIC_IP
-        echo "Docker Swarm initialized with manager at $PUBLIC_IP"
-      else
-        echo "Docker Swarm already initialized"
-      fi
-
-      echo "Swarm initialization complete!"
-      echo "Manager join token:"
-      docker swarm join-token manager
-      echo ""
-      echo "Worker join token:"
-      docker swarm join-token worker
-
+# Minimal SSH hardening (so Ansible can connect securely)
 runcmd:
-  # === SSH and Firewall (run first to ensure remote access) ===
-
-  # Configure UFW firewall BEFORE changing SSH port
-  # Allow port 22 temporarily so SSH remains reachable during the port transition
-  - ufw --force reset
-  - ufw default deny incoming
-  - ufw default allow outgoing
-  - ufw allow 22/tcp comment 'SSH default port (temporary)'
-  - ufw allow ${ssh_port}/tcp comment 'SSH on custom port'
-  - ufw allow 80/tcp comment 'HTTP'
-  - ufw allow 443/tcp comment 'HTTPS TCP'
-  - ufw allow 443/udp comment 'HTTPS UDP (HTTP/3)'
-  - ufw allow 8081/tcp comment 'Custom application port'
-  - ufw --force enable
-
-  # Change SSH port to ${ssh_port}, disable root login, and restart (after UFW allows the new port)
+  # Configure SSH on custom port with basic hardening
   - mkdir -p /etc/ssh/sshd_config.d
-  - echo "Port ${ssh_port}" > /etc/ssh/sshd_config.d/custom_port.conf
-  - echo "PermitRootLogin no" >> /etc/ssh/sshd_config.d/custom_port.conf
-  - echo "PasswordAuthentication no" >> /etc/ssh/sshd_config.d/custom_port.conf
+  - echo "Port ${ssh_port}" > /etc/ssh/sshd_config.d/bootstrap.conf
+  - echo "PermitRootLogin no" >> /etc/ssh/sshd_config.d/bootstrap.conf
+  - echo "PasswordAuthentication no" >> /etc/ssh/sshd_config.d/bootstrap.conf
   - systemctl restart ssh
 
-  # Remove temporary port 22 rule now that SSH is on the custom port
-  - ufw delete allow 22/tcp
-
-  # Start fail2ban (jail.local already in place from write_files with custom SSH port)
-  - systemctl enable fail2ban
-  - systemctl restart fail2ban
-
-  # === Docker Installation ===
-
-  # Wait for any background apt processes (package_update/package_upgrade) to finish
-  - while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do sleep 5; done
-
-  # Create /etc/docker before Docker install so daemon.json (from write_files) is preserved
-  - mkdir -p /etc/docker
-
-  # Install Docker
-  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-  - echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
-  - apt-get update
-  - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-
-  # Enable and start Docker (daemon.json already in place from write_files)
-  - systemctl enable docker
-  - systemctl restart docker
-
-  # Add deployer to docker group (group created by Docker install)
-  - usermod -aG docker deployer
-
-  # === System Configuration ===
-
-  # Configure automatic security updates
-  - echo 'APT::Periodic::Update-Package-Lists "1";' > /etc/apt/apt.conf.d/20auto-upgrades
-  - echo 'APT::Periodic::Unattended-Upgrade "1";' >> /etc/apt/apt.conf.d/20auto-upgrades
-
-  # Create cloudlab directory structure
-  - mkdir -p /opt/cloudlab/scripts
-  - mkdir -p /opt/cloudlab/stacks
-
-  # Initialize Docker Swarm
-  - /usr/local/bin/init-swarm.sh
-
-  # === Grafana Alloy Installation ===
-  
-  # Install Grafana Alloy from official repository
-  - mkdir -p /etc/apt/keyrings/
-  - wget -q -O - https://apt.grafana.com/gpg.key | gpg --dearmor > /etc/apt/keyrings/grafana.gpg
-  - echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main" | tee /etc/apt/sources.list.d/grafana.list
-  - apt-get update
-  - apt-get install -y alloy
-
-  # Create alloy user and configure environment
-  - useradd --system --no-create-home --shell /usr/sbin/nologin alloy || true
-  - usermod -aG docker alloy
-  - mkdir -p /var/lib/alloy/data
-  - chown -R alloy:alloy /var/lib/alloy
-  - cp /etc/default/alloy.dpkg-new /etc/default/alloy || echo 'CONFIG_FILE="/etc/alloy/config.alloy"' > /etc/default/alloy
-
-  # Enable and start Alloy service
-  - systemctl daemon-reload
-  - systemctl enable alloy
-  - systemctl start alloy
-
-  # Set correct permissions
-  - chown -R deployer:deployer /opt/cloudlab
-
-# Reboot after cloud-init completes to apply any kernel upgrades from package_upgrade
+# Reboot to apply kernel upgrades
 power_state:
   delay: now
   mode: reboot
-  message: "Rebooting to apply cloud-init configuration and kernel upgrades"
+  message: "Rebooting after bootstrap to apply kernel upgrades"
   condition: true
 
-final_message: "CloudLab Docker Swarm node is ready! Duration: $UPTIME seconds"
+final_message: "CloudLab bootstrap complete! Ready for Ansible configuration. Duration: $UPTIME seconds"
