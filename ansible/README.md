@@ -48,6 +48,8 @@ poetry install --only main
 ansible-galaxy install -r requirements.yml
 ```
 
+**Note:** CI/CD workflows currently use pip with `requirements.txt` files for simplicity and faster execution. The `poetry.lock` file is primarily for local development reproducibility and Dependabot vulnerability tracking.
+
 ### Legacy Installation (pip)
 
 Alternatively, you can use pip with requirements.txt files:
