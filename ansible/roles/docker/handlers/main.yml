@@ -5,5 +5,4 @@
   ansible.builtin.systemd:
     name: docker
     state: restarted
-  tags:
-    - molecule-notest
+  when: ansible_virtualization_type != 'docker'
