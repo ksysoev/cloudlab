@@ -20,10 +20,11 @@ platforms:
 
 provisioner:
   name: ansible
+  env:
+    ANSIBLE_ROLES_PATH: ${MOLECULE_PROJECT_DIRECTORY}/../../
   config_options:
     defaults:
       callbacks_enabled: profile_tasks,timer,yaml
-      roles_path: ../../../
   inventory:
     group_vars:
       all:
