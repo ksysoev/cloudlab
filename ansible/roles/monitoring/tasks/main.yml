@@ -75,6 +75,7 @@
     dest: /etc/default/alloy
     content: |
       CONFIG_FILE="/etc/alloy/config.alloy"
+      CUSTOM_ARGS="--disable-reporting"
     mode: '0644'
     owner: root
     group: root
