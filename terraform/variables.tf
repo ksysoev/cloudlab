@@ -74,6 +74,12 @@ variable "grafana_cloud_api_key" {
   sensitive   = true
 }
 
+variable "backups_enabled" {
+  description = "Enable weekly backups for the droplet (adds 20% to droplet cost)"
+  type        = bool
+  default     = true
+}
+
 variable "tags" {
   description = "Tags to apply to resources"
   type        = list(string)

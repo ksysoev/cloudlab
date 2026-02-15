@@ -18,6 +18,9 @@ resource "digitalocean_droplet" "swarm_manager" {
   # Enable monitoring
   monitoring = true
 
+  # Enable weekly backups (DigitalOcean managed, adds 20% to droplet cost)
+  backups = var.backups_enabled
+
   # Enable IPv6
   ipv6 = true
 

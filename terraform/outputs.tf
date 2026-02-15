@@ -51,3 +51,8 @@ output "swarm_manager_ip" {
   value       = digitalocean_droplet.swarm_manager.ipv4_address
   sensitive   = true
 }
+
+output "backups_enabled" {
+  description = "Whether weekly backups are enabled for the droplet"
+  value       = var.backups_enabled
+}
