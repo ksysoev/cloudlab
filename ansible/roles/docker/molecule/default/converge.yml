@@ -14,4 +14,4 @@
         create_home: true
 
   roles:
-    - role: docker
+    - role: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') | basename }}"
