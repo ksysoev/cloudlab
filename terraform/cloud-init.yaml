@@ -69,6 +69,12 @@ write_files:
         enable_collectors = ["cpu", "diskstats", "filesystem", "loadavg", "meminfo", "netdev", "stat", "time"]
       }
 
+      // Scrape metrics from unix exporter
+      prometheus.scrape "default" {
+        targets = prometheus.exporter.unix.default.targets
+        forward_to = [prometheus.remote_write.default.receiver]
+      }
+
       // Collect Docker container logs
       discovery.docker "containers" {
         host = "unix:///var/run/docker.sock"
