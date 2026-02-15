@@ -2,10 +2,6 @@
 # Security role - UFW, fail2ban, SSH hardening
 # Translates from cloud-init.yaml lines 44-54, 216-243
 
-- name: Reset UFW to defaults
-  community.general.ufw:
-    state: reset
-
 - name: Set UFW default policies
   community.general.ufw:
     direction: "{{ item.direction }}"

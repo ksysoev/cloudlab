@@ -8,11 +8,13 @@
     state: directory
     mode: '0755'
 
-- name: Add Grafana GPG key
-  ansible.builtin.apt_key:
+- name: Download Grafana GPG key
+  ansible.builtin.get_url:
     url: https://apt.grafana.com/gpg.key
-    keyring: /etc/apt/keyrings/grafana.gpg
-    state: present
+    dest: /etc/apt/keyrings/grafana.gpg
+    mode: '0644'
+    owner: root
+    group: root
 
 - name: Add Grafana repository
   ansible.builtin.apt_repository:
