@@ -90,9 +90,10 @@
 
 - name: Set public IP fact
   ansible.builtin.set_fact:
-    docker_droplet_public_ip: "{{ docker_public_ip_result.content | trim }}"
+    docker_droplet_public_ip: "{{ docker_public_ip_result.content | default('') | trim }}"
   tags:
     - molecule-notest
+  when: docker_public_ip_result.content is defined
 
 - name: Check if Docker Swarm is already initialized
   ansible.builtin.shell: |
