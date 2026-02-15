@@ -1,0 +1,27 @@
+---
+# Ansible-lint configuration
+profile: production
+
+# Exclude specific paths
+exclude_paths:
+  - .cache/
+  - .github/
+  - molecule/
+  - __pycache__/
+
+# Skip specific rules
+skip_list:
+  - yaml[line-length]  # Allow longer lines in YAML
+  - name[casing]       # Allow flexible task naming
+  - fqcn[action-core]  # Allow short module names for core modules
+
+# Enable offline mode (don't check Galaxy)
+offline: false
+
+# Use specific kinds
+kinds:
+  - yaml: "**/meta/main.yml"
+  - playbook: "**/playbooks/*.yml"
+  - tasks: "**/tasks/*.yml"
+  - vars: "**/vars/*.yml"
+  - handlers: "**/handlers/*.yml"

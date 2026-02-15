@@ -1,0 +1,28 @@
+---
+# yamllint configuration
+extends: default
+
+rules:
+  line-length:
+    max: 160
+    level: warning
+  
+  indentation:
+    spaces: 2
+    indent-sequences: true
+  
+  comments:
+    min-spaces-from-content: 1
+  
+  comments-indentation: {}
+  
+  document-start:
+    present: true
+  
+  truthy:
+    allowed-values: ['true', 'false', 'yes', 'no']
+
+ignore: |
+  .cache/
+  .github/
+  molecule/

@@ -27,9 +27,20 @@ ansible/
 - Terraform (for dynamic inventory)
 - SSH access to the droplet
 
-Install required Ansible collections:
+Install required dependencies:
 ```bash
-ansible-galaxy collection install community.general
+# Install Ansible and runtime requirements
+pip install -r requirements.txt
+
+# Install Ansible Galaxy collections
+ansible-galaxy install -r requirements.yml
+```
+
+### Development Requirements
+
+For testing and development:
+```bash
+pip install -r requirements-test.txt
 ```
 
 ## Usage
@@ -108,6 +119,61 @@ The workflow needs these secrets configured in your repository:
 - `GRAFANA_CLOUD_API_KEY` - Grafana Cloud API key
 
 These secrets are passed as extra vars to the playbook during CI/CD runs.
+
+## Testing
+
+The Ansible roles are tested using [Molecule](https://molecule.readthedocs.io/) with Docker and [Testinfra](https://testinfra.readthedocs.io/) for verification.
+
+### Running Tests Locally
+
+Use the provided test script to run all tests:
+
+```bash
+cd ansible
+
+# Run linting only
+./test.sh lint
+
+# Run Molecule tests for all roles
+./test.sh molecule
+
+# Run everything (lint + molecule)
+./test.sh all
+```
+
+### Running Tests for Individual Roles
+
+```bash
+cd ansible/roles/common
+molecule test
+
+cd ../security
+molecule test
+
+cd ../docker
+molecule test
+
+cd ../monitoring
+molecule test
+```
+
+### Test Coverage
+
+Each role has comprehensive tests:
+
+- **common**: Package installation, directory creation, auto-updates
+- **security**: UFW configuration, fail2ban, SSH hardening
+- **docker**: Docker installation, Swarm initialization, daemon config
+- **monitoring**: Grafana Alloy installation, configuration files, service status
+
+### CI/CD Testing
+
+Tests run automatically on every push and pull request via GitHub Actions. See `.github/workflows/test-ansible.yml`.
+
+The workflow runs:
+1. `ansible-lint` - Checks Ansible best practices
+2. `yamllint` - Validates YAML syntax
+3. `molecule test` - Tests each role in isolated Docker containers
 
 ## Migration from cloud-init
 

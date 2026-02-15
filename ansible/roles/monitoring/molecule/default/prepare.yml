@@ -1,0 +1,12 @@
+---
+# Molecule prepare playbook for monitoring role
+- name: Prepare
+  hosts: all
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Create docker group (required for alloy user)
+      ansible.builtin.group:
+        name: docker
+        state: present

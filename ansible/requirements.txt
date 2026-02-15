@@ -1,0 +1,7 @@
+# Ansible Runtime Requirements
+# Install with: pip install -r requirements.txt
+
+ansible>=2.15.0,<3.0
+
+# Required collections will be installed via ansible-galaxy
+# See: ansible-galaxy collection install -r requirements.yml

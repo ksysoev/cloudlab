@@ -1,0 +1,17 @@
+---
+# Molecule converge playbook for docker role
+- name: Converge
+  hosts: all
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Create deployer user for testing
+      ansible.builtin.user:
+        name: deployer
+        groups: users
+        shell: /bin/bash
+        create_home: true
+
+  roles:
+    - role: docker

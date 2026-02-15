@@ -1,0 +1,25 @@
+---
+# Molecule converge playbook for security role
+- name: Converge
+  hosts: all
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Install required packages for testing
+      ansible.builtin.apt:
+        name:
+          - fail2ban
+          - ufw
+          - openssh-server
+        state: present
+        update_cache: true
+
+    - name: Ensure SSH service is started
+      ansible.builtin.systemd:
+        name: ssh
+        state: started
+        enabled: true
+
+  roles:
+    - role: security
