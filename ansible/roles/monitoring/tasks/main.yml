@@ -60,7 +60,6 @@
     owner: alloy
     group: alloy
     mode: '0755'
-    recurse: true
 
 - name: Template Grafana Alloy configuration
   ansible.builtin.template:

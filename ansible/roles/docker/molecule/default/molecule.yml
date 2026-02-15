@@ -35,6 +35,10 @@ provisioner:
         docker_metrics_addr: "127.0.0.1:9323"
         swarm_instance_name: "test-swarm"
         swarm_overlay_network: "test-network"
+  playbooks:
+    converge: converge.yml
+  options:
+    skip-tags: molecule-notest
 
 verifier:
   name: testinfra
