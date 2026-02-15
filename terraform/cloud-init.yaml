@@ -52,8 +52,8 @@ write_files:
       maxretry = 5
       bantime = 3600
 
-  # Grafana Alloy configuration template
-  - path: /opt/cloudlab/alloy/config.alloy
+  # Grafana Alloy configuration for systemd service
+  - path: /etc/alloy/config.alloy
     permissions: '0644'
     content: |
       // Grafana Alloy Configuration
@@ -184,37 +184,6 @@ write_files:
         refresh_interval = "5s"
       }
 
-  # Grafana Alloy Docker Compose file
-  - path: /opt/cloudlab/alloy/docker-compose.yml
-    permissions: '0644'
-    content: |
-      version: '3.8'
-
-      services:
-        alloy:
-          image: grafana/alloy:latest
-          container_name: grafana-alloy
-          restart: unless-stopped
-          volumes:
-            - /opt/cloudlab/alloy/config.alloy:/etc/alloy/config.alloy:ro
-            - /var/run/docker.sock:/var/run/docker.sock:ro
-            - /var/log:/var/log:ro
-            - /:/rootfs:ro
-            - /sys:/sys:ro
-            - /proc:/proc:ro
-          ports:
-            - "12345:12345"  # Alloy UI
-          command:
-            - run
-            - /etc/alloy/config.alloy
-            - --server.http.listen-addr=0.0.0.0:12345
-          network_mode: host
-          deploy:
-            mode: global
-            restart_policy:
-              condition: any
-              delay: 5s
-
   # Init script for Docker Swarm
   - path: /usr/local/bin/init-swarm.sh
     permissions: '0755'
@@ -233,17 +202,6 @@ write_files:
         echo "Docker Swarm initialized with manager at $PUBLIC_IP"
       else
         echo "Docker Swarm already initialized"
-      fi
-
-      # Deploy Grafana Alloy only if endpoint is configured
-      if [ -n "${grafana_cloud_logs_url}" ] || [ -n "${grafana_cloud_metrics_url}" ]; then
-        echo "Deploying Grafana Alloy..."
-        cd /opt/cloudlab/alloy
-        docker stack deploy -c docker-compose.yml monitoring || echo "Alloy deployment failed (please check configuration)"
-      else
-        echo "Grafana Cloud endpoints not configured; skipping Grafana Alloy deployment."
-        echo "To deploy Alloy later, configure your endpoints and run:"
-        echo "  cd /opt/cloudlab/alloy && docker stack deploy -c docker-compose.yml monitoring"
       fi
 
       echo "Swarm initialization complete!"
@@ -309,12 +267,25 @@ runcmd:
   - echo 'APT::Periodic::Unattended-Upgrade "1";' >> /etc/apt/apt.conf.d/20auto-upgrades
 
   # Create cloudlab directory structure
-  - mkdir -p /opt/cloudlab/alloy
   - mkdir -p /opt/cloudlab/scripts
   - mkdir -p /opt/cloudlab/stacks
 
   # Initialize Docker Swarm
   - /usr/local/bin/init-swarm.sh
+
+  # === Grafana Alloy Installation ===
+  
+  # Install Grafana Alloy from official repository
+  - mkdir -p /etc/apt/keyrings/
+  - wget -q -O - https://apt.grafana.com/gpg.key | gpg --dearmor > /etc/apt/keyrings/grafana.gpg
+  - echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main" | tee /etc/apt/sources.list.d/grafana.list
+  - apt-get update
+  - apt-get install -y alloy
+
+  # Enable and start Alloy service
+  - systemctl daemon-reload
+  - systemctl enable alloy
+  - systemctl start alloy
 
   # Set correct permissions
   - chown -R deployer:deployer /opt/cloudlab
