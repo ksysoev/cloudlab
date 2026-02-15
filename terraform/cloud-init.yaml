@@ -183,25 +183,7 @@ write_files:
       docker swarm join-token worker
 
 runcmd:
-  # Create /etc/docker before Docker install so daemon.json (from write_files) is preserved
-  - mkdir -p /etc/docker
-
-  # Install Docker
-  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-  - echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
-  - apt-get update
-  - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-
-  # Enable and start Docker (daemon.json already in place from write_files)
-  - systemctl enable docker
-  - systemctl restart docker
-
-  # Add deployer to docker group (group created by Docker install)
-  - usermod -aG docker deployer
-
-  # Configure automatic security updates
-  - echo 'APT::Periodic::Update-Package-Lists "1";' > /etc/apt/apt.conf.d/20auto-upgrades
-  - echo 'APT::Periodic::Unattended-Upgrade "1";' >> /etc/apt/apt.conf.d/20auto-upgrades
+  # === SSH and Firewall (run first to ensure remote access) ===
 
   # Configure UFW firewall BEFORE changing SSH port
   # Allow port 22 temporarily so SSH remains reachable during the port transition
@@ -228,6 +210,33 @@ runcmd:
   - systemctl enable fail2ban
   - systemctl restart fail2ban
 
+  # === Docker Installation ===
+
+  # Wait for any background apt processes (package_update/package_upgrade) to finish
+  - while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do sleep 5; done
+
+  # Create /etc/docker before Docker install so daemon.json (from write_files) is preserved
+  - mkdir -p /etc/docker
+
+  # Install Docker
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+  - echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+  - apt-get update
+  - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+  # Enable and start Docker (daemon.json already in place from write_files)
+  - systemctl enable docker
+  - systemctl restart docker
+
+  # Add deployer to docker group (group created by Docker install)
+  - usermod -aG docker deployer
+
+  # === System Configuration ===
+
+  # Configure automatic security updates
+  - echo 'APT::Periodic::Update-Package-Lists "1";' > /etc/apt/apt.conf.d/20auto-upgrades
+  - echo 'APT::Periodic::Unattended-Upgrade "1";' >> /etc/apt/apt.conf.d/20auto-upgrades
+
   # Create cloudlab directory structure
   - mkdir -p /opt/cloudlab/alloy
   - mkdir -p /opt/cloudlab/scripts
@@ -238,5 +247,12 @@ runcmd:
 
   # Set correct permissions
   - chown -R deployer:deployer /opt/cloudlab
+
+# Reboot after cloud-init completes to apply any kernel upgrades from package_upgrade
+power_state:
+  delay: now
+  mode: reboot
+  message: "Rebooting to apply cloud-init configuration and kernel upgrades"
+  condition: true
 
 final_message: "CloudLab Docker Swarm node is ready! Duration: $UPTIME seconds"
