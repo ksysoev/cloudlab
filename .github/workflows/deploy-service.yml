@@ -69,6 +69,13 @@ jobs:
           else
             SERVICE_NAME=$(echo "${{ inputs.service_name }}" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]-' | tr '-' '')
           fi
+          
+          # Validate that the sanitized service name is not empty
+          if [ -z "$SERVICE_NAME" ]; then
+            echo "Error: Service name is empty after sanitization. Use only letters (a-z) and digits (0-9) in the repository or service_name input."
+            exit 1
+          fi
+          
           echo "service_name=$SERVICE_NAME" >> $GITHUB_OUTPUT
           
           # Set deployment path
@@ -120,31 +127,29 @@ jobs:
           
           ssh -i ~/.ssh/deploy_key \
               -p ${{ inputs.ssh_port }} \
-              ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} << 'EOF'
+              ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} << EOF
             SERVICE_NAME="${{ steps.validate.outputs.service_name }}"
             DEPLOY_PATH="${{ steps.validate.outputs.deploy_path }}"
-            BACKUP_DIR="${{ env.BACKUP_DIR }}"
+            BACKUP_DIR="$BACKUP_DIR"
             
             # Check if stack exists
-            if docker stack ps "$SERVICE_NAME" &>/dev/null; then
+            if docker stack ps "\$SERVICE_NAME" &>/dev/null; then
               echo "Creating backup of current deployment..."
-              mkdir -p "$BACKUP_DIR"
+              mkdir -p "\$BACKUP_DIR"
               
               # Save current compose file
-              if [ -f "$DEPLOY_PATH/docker-compose.yml" ]; then
-                cp "$DEPLOY_PATH/docker-compose.yml" "$BACKUP_DIR/"
+              if [ -f "\$DEPLOY_PATH/docker-compose.yml" ]; then
+                cp "\$DEPLOY_PATH/docker-compose.yml" "\$BACKUP_DIR/"
               fi
               
               # Save stack name
-              echo "$SERVICE_NAME" > "$BACKUP_DIR/stack_name"
+              echo "\$SERVICE_NAME" > "\$BACKUP_DIR/stack_name"
               
-              echo "Backup created at $BACKUP_DIR"
+              echo "Backup created at \$BACKUP_DIR"
             else
               echo "No existing stack found, skipping backup"
             fi
           EOF
-        env:
-          BACKUP_DIR: ${{ steps.backup.outputs.backup_dir }}
 
       - name: Prepare deployment directory
         run: |
@@ -180,10 +185,19 @@ jobs:
               ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} << 'EOF'
             cd ${{ steps.validate.outputs.deploy_path }}
             
-            # Parse environment variables and export them
-            echo '${{ inputs.environment_vars }}' | jq -r 'to_entries | .[] | "export \(.key)=\"\(.value)\""' > /tmp/deploy_env.sh
-            source /tmp/deploy_env.sh
-            rm /tmp/deploy_env.sh
+            # Parse environment variables with proper shell escaping
+            # Validate keys and use @sh for safe shell quoting
+            ENV_VARS='${{ inputs.environment_vars }}'
+            
+            # Export environment variables safely using eval with jq's @sh formatter
+            while IFS='=' read -r key value; do
+              # Validate key is a valid environment variable name
+              if [[ ! "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+                echo "Error: Invalid environment variable name: $key"
+                exit 1
+              fi
+              export "$key=$value"
+            done < <(echo "$ENV_VARS" | jq -r 'to_entries | .[] | "\(.key)=\(.value)"')
             
             echo "Pulling Docker images..."
             docker compose pull
@@ -197,10 +211,19 @@ jobs:
               ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} << 'EOF'
             cd ${{ steps.validate.outputs.deploy_path }}
             
-            # Parse environment variables and export them
-            echo '${{ inputs.environment_vars }}' | jq -r 'to_entries | .[] | "export \(.key)=\"\(.value)\""' > /tmp/deploy_env.sh
-            source /tmp/deploy_env.sh
-            rm /tmp/deploy_env.sh
+            # Parse environment variables with proper shell escaping
+            # Validate keys and use @sh for safe shell quoting
+            ENV_VARS='${{ inputs.environment_vars }}'
+            
+            # Export environment variables safely using eval with jq's @sh formatter
+            while IFS='=' read -r key value; do
+              # Validate key is a valid environment variable name
+              if [[ ! "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+                echo "Error: Invalid environment variable name: $key"
+                exit 1
+              fi
+              export "$key=$value"
+            done < <(echo "$ENV_VARS" | jq -r 'to_entries | .[] | "\(.key)=\(.value)"')
             
             SERVICE_NAME="${{ steps.validate.outputs.service_name }}"
             
@@ -213,7 +236,7 @@ jobs:
       - name: Wait for services to be ready
         if: inputs.health_check_timeout > 0
         id: health_check
-        timeout-minutes: ${{ fromJSON(inputs.health_check_timeout) / 60 + 1 }}
+        timeout-minutes: 15
         run: |
           ssh -i ~/.ssh/deploy_key \
               -p ${{ inputs.ssh_port }} \
@@ -318,10 +341,17 @@ jobs:
                 
                 cd "$DEPLOY_PATH"
                 
-                # Parse environment variables and export them
-                echo '${{ inputs.environment_vars }}' | jq -r 'to_entries | .[] | "export \(.key)=\"\(.value)\""' > /tmp/deploy_env.sh
-                source /tmp/deploy_env.sh
-                rm /tmp/deploy_env.sh
+                # Parse environment variables with proper shell escaping
+                ENV_VARS='${{ inputs.environment_vars }}'
+                
+                # Export environment variables safely
+                while IFS='=' read -r key value; do
+                  if [[ ! "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+                    echo "Error: Invalid environment variable name: $key"
+                    exit 1
+                  fi
+                  export "$key=$value"
+                done < <(echo "$ENV_VARS" | jq -r 'to_entries | .[] | "\(.key)=\(.value)"')
                 
                 docker stack deploy -c docker-compose.yml "$STACK_NAME"
                 
@@ -341,15 +371,16 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          rm -f ~/.ssh/deploy_key
-          
-          # Cleanup old backups on server (keep last 5)
+          # Cleanup old backups on server (keep last 5) - do this before removing SSH key
           ssh -i ~/.ssh/deploy_key \
               -p ${{ inputs.ssh_port }} \
               ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} << 'EOF' || true
             cd /tmp
             ls -dt cloudlab-backup-* 2>/dev/null | tail -n +6 | xargs rm -rf 2>/dev/null || true
           EOF
+          
+          # Remove SSH key after all SSH operations are complete
+          rm -f ~/.ssh/deploy_key
 
       - name: Deployment summary
         if: success()

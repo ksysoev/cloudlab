@@ -256,7 +256,7 @@ CloudLab includes a **reusable GitHub Actions workflow** for deploying services 
 - **Health checks** with configurable timeout
 - **Automatic rollback** on deployment failure
 - **Zero-downtime deployments** with Docker Swarm's rolling updates
-- **Environment variable injection** without storing secrets on disk
+- **Secure environment variable injection** for secrets and configuration
 - **Version tracking** with stack naming
 
 ### Usage in Your Service Repository
