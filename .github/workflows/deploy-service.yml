@@ -1,0 +1,367 @@
+name: Deploy Service to Cloudlab
+
+on:
+  workflow_call:
+    inputs:
+      service_name:
+        description: 'Service name for the Docker stack (defaults to sanitized repository name)'
+        required: false
+        type: string
+      docker_compose_file:
+        description: 'Path to docker-compose file in caller repository'
+        required: true
+        type: string
+      environment_vars:
+        description: 'JSON object of environment variables to pass to deployment'
+        required: false
+        type: string
+        default: '{}'
+      ssh_host:
+        description: 'Cloudlab droplet hostname or IP address'
+        required: true
+        type: string
+      ssh_user:
+        description: 'SSH username for deployment'
+        required: false
+        type: string
+        default: 'deployer'
+      ssh_port:
+        description: 'SSH port for deployment'
+        required: false
+        type: string
+        default: '1923'
+      deploy_path:
+        description: 'Deployment directory on the server (defaults to /opt/cloudlab/stacks/<service_name>)'
+        required: false
+        type: string
+      health_check_timeout:
+        description: 'Timeout in seconds for health check (0 to disable)'
+        required: false
+        type: number
+        default: 60
+      enable_rollback:
+        description: 'Enable automatic rollback on deployment failure'
+        required: false
+        type: boolean
+        default: true
+    secrets:
+      ssh_key:
+        description: 'SSH private key for deployment'
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: Checkout caller repository
+        uses: actions/checkout@v6
+
+      - name: Validate inputs
+        id: validate
+        run: |
+          # Sanitize service name from repository name if not provided
+          if [ -z "${{ inputs.service_name }}" ]; then
+            # Extract repo name and sanitize (remove special chars, lowercase)
+            REPO_NAME="${GITHUB_REPOSITORY##*/}"
+            SERVICE_NAME=$(echo "$REPO_NAME" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]-' | tr '-' '')
+          else
+            SERVICE_NAME=$(echo "${{ inputs.service_name }}" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]-' | tr '-' '')
+          fi
+          echo "service_name=$SERVICE_NAME" >> $GITHUB_OUTPUT
+          
+          # Set deployment path
+          if [ -z "${{ inputs.deploy_path }}" ]; then
+            DEPLOY_PATH="/opt/cloudlab/stacks/$SERVICE_NAME"
+          else
+            DEPLOY_PATH="${{ inputs.deploy_path }}"
+          fi
+          echo "deploy_path=$DEPLOY_PATH" >> $GITHUB_OUTPUT
+          
+          # Validate docker-compose file exists
+          if [ ! -f "${{ inputs.docker_compose_file }}" ]; then
+            echo "Error: Docker compose file not found: ${{ inputs.docker_compose_file }}"
+            exit 1
+          fi
+          
+          # Validate JSON environment variables
+          if ! echo '${{ inputs.environment_vars }}' | jq empty 2>/dev/null; then
+            echo "Error: Invalid JSON in environment_vars"
+            exit 1
+          fi
+          
+          echo "Deployment configuration:"
+          echo "  Service: $SERVICE_NAME"
+          echo "  Deploy path: $DEPLOY_PATH"
+          echo "  SSH: ${{ inputs.ssh_user }}@${{ inputs.ssh_host }}:${{ inputs.ssh_port }}"
+
+      - name: Prepare SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.ssh_key }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ inputs.ssh_port }} -H ${{ inputs.ssh_host }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Test SSH connectivity
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+              -p ${{ inputs.ssh_port }} \
+              -o StrictHostKeyChecking=accept-new \
+              ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} \
+              "echo 'SSH connection successful'"
+
+      - name: Backup current deployment (for rollback)
+        if: inputs.enable_rollback
+        id: backup
+        run: |
+          BACKUP_DIR="/tmp/cloudlab-backup-$(date +%s)"
+          echo "backup_dir=$BACKUP_DIR" >> $GITHUB_OUTPUT
+          
+          ssh -i ~/.ssh/deploy_key \
+              -p ${{ inputs.ssh_port }} \
+              ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} << 'EOF'
+            SERVICE_NAME="${{ steps.validate.outputs.service_name }}"
+            DEPLOY_PATH="${{ steps.validate.outputs.deploy_path }}"
+            BACKUP_DIR="${{ env.BACKUP_DIR }}"
+            
+            # Check if stack exists
+            if docker stack ps "$SERVICE_NAME" &>/dev/null; then
+              echo "Creating backup of current deployment..."
+              mkdir -p "$BACKUP_DIR"
+              
+              # Save current compose file
+              if [ -f "$DEPLOY_PATH/docker-compose.yml" ]; then
+                cp "$DEPLOY_PATH/docker-compose.yml" "$BACKUP_DIR/"
+              fi
+              
+              # Save stack name
+              echo "$SERVICE_NAME" > "$BACKUP_DIR/stack_name"
+              
+              echo "Backup created at $BACKUP_DIR"
+            else
+              echo "No existing stack found, skipping backup"
+            fi
+          EOF
+        env:
+          BACKUP_DIR: ${{ steps.backup.outputs.backup_dir }}
+
+      - name: Prepare deployment directory
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+              -p ${{ inputs.ssh_port }} \
+              ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} \
+              "mkdir -p ${{ steps.validate.outputs.deploy_path }}"
+
+      - name: Copy docker-compose file
+        run: |
+          scp -i ~/.ssh/deploy_key \
+              -P ${{ inputs.ssh_port }} \
+              ${{ inputs.docker_compose_file }} \
+              ${{ inputs.ssh_user }}@${{ inputs.ssh_host }}:${{ steps.validate.outputs.deploy_path }}/docker-compose.yml
+
+      - name: Validate docker-compose syntax
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+              -p ${{ inputs.ssh_port }} \
+              ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} << 'EOF'
+            cd ${{ steps.validate.outputs.deploy_path }}
+            if ! docker compose config > /dev/null 2>&1; then
+              echo "Error: Invalid docker-compose.yml syntax"
+              exit 1
+            fi
+            echo "Docker compose file validation successful"
+          EOF
+
+      - name: Pull Docker images
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+              -p ${{ inputs.ssh_port }} \
+              ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} << 'EOF'
+            cd ${{ steps.validate.outputs.deploy_path }}
+            
+            # Parse environment variables and export them
+            echo '${{ inputs.environment_vars }}' | jq -r 'to_entries | .[] | "export \(.key)=\"\(.value)\""' > /tmp/deploy_env.sh
+            source /tmp/deploy_env.sh
+            rm /tmp/deploy_env.sh
+            
+            echo "Pulling Docker images..."
+            docker compose pull
+          EOF
+
+      - name: Deploy to Docker Swarm
+        id: deploy
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+              -p ${{ inputs.ssh_port }} \
+              ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} << 'EOF'
+            cd ${{ steps.validate.outputs.deploy_path }}
+            
+            # Parse environment variables and export them
+            echo '${{ inputs.environment_vars }}' | jq -r 'to_entries | .[] | "export \(.key)=\"\(.value)\""' > /tmp/deploy_env.sh
+            source /tmp/deploy_env.sh
+            rm /tmp/deploy_env.sh
+            
+            SERVICE_NAME="${{ steps.validate.outputs.service_name }}"
+            
+            echo "Deploying stack: $SERVICE_NAME"
+            docker stack deploy -c docker-compose.yml --prune --resolve-image always "$SERVICE_NAME"
+            
+            echo "Deployment command completed"
+          EOF
+
+      - name: Wait for services to be ready
+        if: inputs.health_check_timeout > 0
+        id: health_check
+        timeout-minutes: ${{ fromJSON(inputs.health_check_timeout) / 60 + 1 }}
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+              -p ${{ inputs.ssh_port }} \
+              ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} << 'EOF'
+            SERVICE_NAME="${{ steps.validate.outputs.service_name }}"
+            TIMEOUT=${{ inputs.health_check_timeout }}
+            
+            echo "Waiting for services to be ready (timeout: ${TIMEOUT}s)..."
+            
+            END_TIME=$(($(date +%s) + TIMEOUT))
+            
+            while [ $(date +%s) -lt $END_TIME ]; do
+              # Get all services in the stack
+              SERVICES=$(docker stack services "$SERVICE_NAME" --format "{{.Name}}" 2>/dev/null || true)
+              
+              if [ -z "$SERVICES" ]; then
+                echo "No services found yet, waiting..."
+                sleep 5
+                continue
+              fi
+              
+              ALL_READY=true
+              
+              for SERVICE in $SERVICES; do
+                # Get replicas status (e.g., "1/1" means 1 running out of 1 desired)
+                REPLICAS=$(docker service ls --filter "name=$SERVICE" --format "{{.Replicas}}" | head -n1)
+                
+                if [ -z "$REPLICAS" ]; then
+                  echo "Service $SERVICE: No replica info yet"
+                  ALL_READY=false
+                  continue
+                fi
+                
+                # Parse running/desired counts
+                RUNNING=$(echo "$REPLICAS" | cut -d'/' -f1)
+                DESIRED=$(echo "$REPLICAS" | cut -d'/' -f2)
+                
+                if [ "$RUNNING" != "$DESIRED" ]; then
+                  echo "Service $SERVICE: $REPLICAS replicas"
+                  ALL_READY=false
+                else
+                  echo "Service $SERVICE: Ready ($REPLICAS)"
+                fi
+              done
+              
+              if [ "$ALL_READY" = true ]; then
+                echo "All services are ready!"
+                exit 0
+              fi
+              
+              sleep 5
+            done
+            
+            echo "Timeout waiting for services to be ready"
+            docker stack ps "$SERVICE_NAME"
+            exit 1
+          EOF
+
+      - name: Verify deployment
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+              -p ${{ inputs.ssh_port }} \
+              ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} << 'EOF'
+            SERVICE_NAME="${{ steps.validate.outputs.service_name }}"
+            
+            echo "=== Stack Status ==="
+            docker stack ps "$SERVICE_NAME"
+            
+            echo ""
+            echo "=== Services ==="
+            docker stack services "$SERVICE_NAME"
+            
+            # Check for failed tasks
+            FAILED=$(docker stack ps "$SERVICE_NAME" --filter "desired-state=running" --format "{{.CurrentState}}" | grep -i "failed" || true)
+            
+            if [ -n "$FAILED" ]; then
+              echo ""
+              echo "WARNING: Some tasks have failed:"
+              echo "$FAILED"
+            fi
+          EOF
+
+      - name: Rollback on failure
+        if: failure() && inputs.enable_rollback && steps.backup.outputs.backup_dir != ''
+        run: |
+          echo "Deployment failed, initiating rollback..."
+          
+          ssh -i ~/.ssh/deploy_key \
+              -p ${{ inputs.ssh_port }} \
+              ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} << 'EOF'
+            BACKUP_DIR="${{ steps.backup.outputs.backup_dir }}"
+            
+            if [ -d "$BACKUP_DIR" ] && [ -f "$BACKUP_DIR/stack_name" ]; then
+              STACK_NAME=$(cat "$BACKUP_DIR/stack_name")
+              DEPLOY_PATH="${{ steps.validate.outputs.deploy_path }}"
+              
+              echo "Rolling back to previous deployment..."
+              
+              # Restore compose file
+              if [ -f "$BACKUP_DIR/docker-compose.yml" ]; then
+                cp "$BACKUP_DIR/docker-compose.yml" "$DEPLOY_PATH/"
+                
+                cd "$DEPLOY_PATH"
+                
+                # Parse environment variables and export them
+                echo '${{ inputs.environment_vars }}' | jq -r 'to_entries | .[] | "export \(.key)=\"\(.value)\""' > /tmp/deploy_env.sh
+                source /tmp/deploy_env.sh
+                rm /tmp/deploy_env.sh
+                
+                docker stack deploy -c docker-compose.yml "$STACK_NAME"
+                
+                echo "Rollback completed"
+              else
+                echo "No backup compose file found, removing failed stack..."
+                docker stack rm "$STACK_NAME"
+              fi
+              
+              # Cleanup backup
+              rm -rf "$BACKUP_DIR"
+            else
+              echo "No backup found, skipping rollback"
+            fi
+          EOF
+
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -f ~/.ssh/deploy_key
+          
+          # Cleanup old backups on server (keep last 5)
+          ssh -i ~/.ssh/deploy_key \
+              -p ${{ inputs.ssh_port }} \
+              ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} << 'EOF' || true
+            cd /tmp
+            ls -dt cloudlab-backup-* 2>/dev/null | tail -n +6 | xargs rm -rf 2>/dev/null || true
+          EOF
+
+      - name: Deployment summary
+        if: success()
+        run: |
+          echo "### Deployment Successful! :rocket:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Service:** ${{ steps.validate.outputs.service_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Deploy Path:** ${{ steps.validate.outputs.deploy_path }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Host:** ${{ inputs.ssh_host }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Use the following command to check status:" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "ssh -p ${{ inputs.ssh_port }} ${{ inputs.ssh_user }}@${{ inputs.ssh_host }}" >> $GITHUB_STEP_SUMMARY
+          echo "docker stack ps ${{ steps.validate.outputs.service_name }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
