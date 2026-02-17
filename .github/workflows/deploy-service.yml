@@ -32,7 +32,7 @@ on:
         type: string
         default: ''
       deploy_path:
-        description: 'Deployment directory on the server (defaults to /opt/cloudlab/stacks/<service_name>)'
+        description: 'Deployment directory on the server (defaults to ~/cloudlab/stacks/<service_name>)'
         required: false
         type: string
       health_check_timeout:
