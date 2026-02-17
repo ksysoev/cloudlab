@@ -44,6 +44,11 @@ on:
         required: false
         type: boolean
         default: true
+      environment_name:
+        description: 'GitHub environment name to use for deployment (e.g., production, staging)'
+        required: false
+        type: string
+        default: ''
     secrets:
       ssh_key:
         description: 'SSH private key for deployment'
@@ -53,6 +58,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    environment: ${{ inputs.environment_name }}
     
     steps:
       - name: Checkout caller repository
