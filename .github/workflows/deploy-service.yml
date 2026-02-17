@@ -112,9 +112,9 @@ jobs:
           if [ -z "${{ inputs.service_name }}" ]; then
             # Extract repo name and sanitize (remove special chars, lowercase)
             REPO_NAME="${GITHUB_REPOSITORY##*/}"
-            SERVICE_NAME=$(echo "$REPO_NAME" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]-' | tr '-' '')
+            SERVICE_NAME=$(echo "$REPO_NAME" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]-' | tr -d '-')
           else
-            SERVICE_NAME=$(echo "${{ inputs.service_name }}" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]-' | tr '-' '')
+            SERVICE_NAME=$(echo "${{ inputs.service_name }}" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]-' | tr -d '-')
           fi
           
           # Validate that the sanitized service name is not empty
