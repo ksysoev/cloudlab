@@ -195,6 +195,7 @@ cloudlab/
 ├── .github/workflows/      # CI/CD automation
 │   ├── provision.yml       # Terraform (infrastructure)
 │   ├── configure.yml       # Ansible (configuration)
+│   ├── deploy-service.yml  # Reusable deployment workflow
 │   └── test.yml            # Terraform validation
 │
 └── docs/                   # Documentation
@@ -244,6 +245,158 @@ Perfect for:
 - Development and staging environments
 - Small production workloads
 - Microservices architecture practice
+
+## Reusable Deployment Workflow
+
+CloudLab includes a **reusable GitHub Actions workflow** for deploying services to your droplet. This workflow handles Docker Swarm deployments with automatic health checks, rollback support, and zero-downtime updates.
+
+### Features
+
+- **Automated deployment** to Docker Swarm via GitHub Actions
+- **Health checks** with configurable timeout
+- **Automatic rollback** on deployment failure
+- **Zero-downtime deployments** with Docker Swarm's rolling updates
+- **Secure environment variable injection** for secrets and configuration
+- **Version tracking** with stack naming
+
+### Usage in Your Service Repository
+
+Add this to your service's `.github/workflows/deploy.yml`:
+
+```yaml
+name: Deploy to Cloudlab
+
+on:
+  push:
+    tags:
+      - v*
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    uses: YOUR_USERNAME/cloudlab/.github/workflows/deploy-service.yml@main
+    with:
+      service_name: my-service
+      docker_compose_file: deploy/docker-compose.yml
+      ssh_host: ${{ secrets.CLOUDLAB_HOST }}
+      ssh_user: deployer
+      ssh_port: "1923"
+      health_check_timeout: 60
+      enable_rollback: true
+      environment_vars: |
+        {
+          "VERSION": "${{ github.ref_name }}",
+          "DATABASE_URL": "${{ secrets.DATABASE_URL }}",
+          "API_KEY": "${{ secrets.API_KEY }}"
+        }
+    secrets:
+      ssh_key: ${{ secrets.CLOUDLAB_SSH_KEY }}
+```
+
+### Required Inputs
+
+| Input | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `docker_compose_file` | ✅ | - | Path to docker-compose file in your repository |
+| `ssh_host` | ✅ | - | Cloudlab droplet IP or hostname |
+
+### Optional Inputs
+
+| Input | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `service_name` | ❌ | Sanitized repo name | Docker stack name |
+| `ssh_user` | ❌ | `deployer` | SSH username |
+| `ssh_port` | ❌ | `1923` | SSH port |
+| `deploy_path` | ❌ | `/opt/cloudlab/stacks/<service_name>` | Deployment directory |
+| `health_check_timeout` | ❌ | `60` | Timeout in seconds (0 to disable) |
+| `enable_rollback` | ❌ | `true` | Enable automatic rollback on failure |
+| `environment_vars` | ❌ | `{}` | JSON object of environment variables |
+
+### Required Secrets
+
+| Secret | Description |
+|--------|-------------|
+| `ssh_key` | SSH private key for accessing the droplet |
+
+### Example: Deploying with Embedded Configuration
+
+For services that need configuration files (like Caddy, Nginx), embed them in your Docker image:
+
+**Dockerfile:**
+```dockerfile
+FROM nginx:alpine
+COPY nginx.conf /etc/nginx/nginx.conf
+COPY static /usr/share/nginx/html
+```
+
+**docker-compose.yml:**
+```yaml
+services:
+  web:
+    image: ghcr.io/YOUR_USERNAME/my-service:${VERSION}
+    ports:
+      - target: 80
+        published: 80
+        mode: host
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+    deploy:
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        order: start-first
+```
+
+### Inter-Service Communication
+
+Services can communicate via:
+
+1. **Host network** - Expose ports with `mode: host` in docker-compose
+2. **Overlay networks** - Use service-specific overlay networks
+3. **External services** - Connect to other services via host IP
+
+Example of exposing an API for other services:
+
+```yaml
+services:
+  api:
+    image: my-api:latest
+    ports:
+      - target: 8080
+        published: 8080
+        mode: host  # Accessible at host_ip:8080
+    networks:
+      - backend
+```
+
+Other services can connect to this API using the droplet's IP address and port 8080.
+
+### Rollback Strategy
+
+The workflow automatically creates backups before deployment:
+
+1. **Before deployment:** Current docker-compose.yml is backed up
+2. **If deployment fails:** Automatically rolls back to the previous version
+3. **Cleanup:** Old backups are automatically cleaned up (keeps last 5)
+
+Manual rollback:
+```bash
+ssh -p 1923 deployer@<droplet-ip>
+cd /opt/cloudlab/stacks/my-service
+docker stack deploy -c docker-compose.yml my-service
+```
+
+### Best Practices
+
+1. **Version your images:** Use specific tags, not `latest`
+2. **Health checks:** Define health checks in your docker-compose
+3. **Rolling updates:** Use `update_config` for zero-downtime deploys
+4. **Resource limits:** Set memory and CPU limits
+5. **Secrets:** Pass via `environment_vars`, never commit to git
+
+See the [make-it-public example](https://github.com/ksysoev/make-it-public) for a complete implementation.
 
 ## Scaling Options
 
@@ -323,7 +476,7 @@ MIT License - See [LICENSE](LICENSE) file
 ## Roadmap
 
 Future enhancements:
-- [ ] Deployment workflows and CI/CD integration examples
+- [x] Deployment workflows and CI/CD integration examples
 - [ ] Traefik for automatic SSL and routing
 - [ ] Automated backups to DigitalOcean Spaces
 - [ ] Multi-region support
