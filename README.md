@@ -307,7 +307,7 @@ jobs:
 | `service_name` | ❌ | Sanitized repo name | Docker stack name |
 | `ssh_user` | ❌ | `deployer` | SSH username |
 | `ssh_port` | ❌ | `1923` | SSH port |
-| `deploy_path` | ❌ | `/opt/cloudlab/stacks/<service_name>` | Deployment directory |
+| `deploy_path` | ❌ | `~/cloudlab/stacks/<service_name>` | Deployment directory |
 | `health_check_timeout` | ❌ | `60` | Timeout in seconds (0 to disable) |
 | `enable_rollback` | ❌ | `true` | Enable automatic rollback on failure |
 | `environment_vars` | ❌ | `{}` | JSON object of environment variables |
@@ -384,7 +384,7 @@ The workflow automatically creates backups before deployment:
 Manual rollback:
 ```bash
 ssh -p 1923 deployer@<droplet-ip>
-cd /opt/cloudlab/stacks/my-service
+cd ~/cloudlab/stacks/my-service
 docker stack deploy -c docker-compose.yml my-service
 ```
 

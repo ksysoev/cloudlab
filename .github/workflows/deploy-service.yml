@@ -17,21 +17,22 @@ on:
         type: string
         default: '{}'
       ssh_host:
-        description: 'Cloudlab droplet hostname or IP address'
-        required: true
+        description: 'Cloudlab droplet hostname or IP address (deprecated: use secrets.ssh_host instead)'
+        required: false
         type: string
+        default: ''
       ssh_user:
-        description: 'SSH username for deployment'
+        description: 'SSH username for deployment (deprecated: use secrets.ssh_user instead, defaults to deployer)'
         required: false
         type: string
-        default: 'deployer'
+        default: ''
       ssh_port:
-        description: 'SSH port for deployment'
+        description: 'SSH port for deployment (deprecated: use secrets.ssh_port instead, defaults to 1923)'
         required: false
         type: string
-        default: '1923'
+        default: ''
       deploy_path:
-        description: 'Deployment directory on the server (defaults to /opt/cloudlab/stacks/<service_name>)'
+        description: 'Deployment directory on the server (defaults to ~/cloudlab/stacks/<service_name>)'
         required: false
         type: string
       health_check_timeout:
@@ -44,15 +45,33 @@ on:
         required: false
         type: boolean
         default: true
+      environment_name:
+        description: 'GitHub environment name to use for deployment (e.g., production, staging)'
+        required: false
+        type: string
+        default: ''
     secrets:
       ssh_key:
         description: 'SSH private key for deployment'
         required: true
+      ssh_host:
+        description: 'Cloudlab droplet hostname or IP address'
+        required: false
+      ssh_user:
+        description: 'SSH username for deployment'
+        required: false
+      ssh_port:
+        description: 'SSH port for deployment'
+        required: false
+      deployment_secrets:
+        description: 'JSON object of secret environment variables for deployment (alternative to environment_vars for secrets)'
+        required: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    environment: ${{ inputs.environment_name }}
     
     steps:
       - name: Checkout caller repository
@@ -61,13 +80,41 @@ jobs:
       - name: Validate inputs
         id: validate
         run: |
+          # Set SSH connection parameters (prefer secrets over inputs)
+          SSH_HOST="${{ secrets.ssh_host }}"
+          SSH_USER="${{ secrets.ssh_user }}"
+          SSH_PORT="${{ secrets.ssh_port }}"
+          
+          # Fall back to inputs if secrets not provided
+          if [ -z "$SSH_HOST" ]; then
+            SSH_HOST="${{ steps.validate.outputs.ssh_host }}"
+          fi
+          if [ -z "$SSH_USER" ]; then
+            SSH_USER="${{ steps.validate.outputs.ssh_user }}"
+          fi
+          if [ -z "$SSH_PORT" ]; then
+            SSH_PORT="${{ steps.validate.outputs.ssh_port }}"
+          fi
+          
+          # Set defaults for optional parameters
+          if [ -z "$SSH_USER" ]; then
+            SSH_USER="deployer"
+          fi
+          if [ -z "$SSH_PORT" ]; then
+            SSH_PORT="1923"
+          fi
+          
+          echo "ssh_host=$SSH_HOST" >> $GITHUB_OUTPUT
+          echo "ssh_user=$SSH_USER" >> $GITHUB_OUTPUT
+          echo "ssh_port=$SSH_PORT" >> $GITHUB_OUTPUT
+          
           # Sanitize service name from repository name if not provided
           if [ -z "${{ inputs.service_name }}" ]; then
             # Extract repo name and sanitize (remove special chars, lowercase)
             REPO_NAME="${GITHUB_REPOSITORY##*/}"
-            SERVICE_NAME=$(echo "$REPO_NAME" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]-' | tr '-' '')
+            SERVICE_NAME=$(echo "$REPO_NAME" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]-' | tr -d '-')
           else
-            SERVICE_NAME=$(echo "${{ inputs.service_name }}" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]-' | tr '-' '')
+            SERVICE_NAME=$(echo "${{ inputs.service_name }}" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]-' | tr -d '-')
           fi
           
           # Validate that the sanitized service name is not empty
@@ -80,7 +127,7 @@ jobs:
           
           # Set deployment path
           if [ -z "${{ inputs.deploy_path }}" ]; then
-            DEPLOY_PATH="/opt/cloudlab/stacks/$SERVICE_NAME"
+            DEPLOY_PATH="~/cloudlab/stacks/$SERVICE_NAME"
           else
             DEPLOY_PATH="${{ inputs.deploy_path }}"
           fi
@@ -101,21 +148,21 @@ jobs:
           echo "Deployment configuration:"
           echo "  Service: $SERVICE_NAME"
           echo "  Deploy path: $DEPLOY_PATH"
-          echo "  SSH: ${{ inputs.ssh_user }}@${{ inputs.ssh_host }}:${{ inputs.ssh_port }}"
+          echo "  SSH: ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }}:${{ steps.validate.outputs.ssh_port }}"
 
       - name: Prepare SSH key
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.ssh_key }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -p ${{ inputs.ssh_port }} -H ${{ inputs.ssh_host }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          ssh-keyscan -p ${{ steps.validate.outputs.ssh_port }} -H ${{ steps.validate.outputs.ssh_host }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
       - name: Test SSH connectivity
         run: |
           ssh -i ~/.ssh/deploy_key \
-              -p ${{ inputs.ssh_port }} \
+              -p ${{ steps.validate.outputs.ssh_port }} \
               -o StrictHostKeyChecking=accept-new \
-              ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} \
+              ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }} \
               "echo 'SSH connection successful'"
 
       - name: Backup current deployment (for rollback)
@@ -126,8 +173,8 @@ jobs:
           echo "backup_dir=$BACKUP_DIR" >> $GITHUB_OUTPUT
           
           ssh -i ~/.ssh/deploy_key \
-              -p ${{ inputs.ssh_port }} \
-              ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} << EOF
+              -p ${{ steps.validate.outputs.ssh_port }} \
+              ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }} << EOF
             SERVICE_NAME="${{ steps.validate.outputs.service_name }}"
             DEPLOY_PATH="${{ steps.validate.outputs.deploy_path }}"
             BACKUP_DIR="$BACKUP_DIR"
@@ -154,22 +201,22 @@ jobs:
       - name: Prepare deployment directory
         run: |
           ssh -i ~/.ssh/deploy_key \
-              -p ${{ inputs.ssh_port }} \
-              ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} \
+              -p ${{ steps.validate.outputs.ssh_port }} \
+              ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }} \
               "mkdir -p ${{ steps.validate.outputs.deploy_path }}"
 
       - name: Copy docker-compose file
         run: |
           scp -i ~/.ssh/deploy_key \
-              -P ${{ inputs.ssh_port }} \
+              -P ${{ steps.validate.outputs.ssh_port }} \
               ${{ inputs.docker_compose_file }} \
-              ${{ inputs.ssh_user }}@${{ inputs.ssh_host }}:${{ steps.validate.outputs.deploy_path }}/docker-compose.yml
+              ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }}:${{ steps.validate.outputs.deploy_path }}/docker-compose.yml
 
       - name: Validate docker-compose syntax
         run: |
           ssh -i ~/.ssh/deploy_key \
-              -p ${{ inputs.ssh_port }} \
-              ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} << 'EOF'
+              -p ${{ steps.validate.outputs.ssh_port }} \
+              ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }} << 'EOF'
             cd ${{ steps.validate.outputs.deploy_path }}
             if ! docker compose config > /dev/null 2>&1; then
               echo "Error: Invalid docker-compose.yml syntax"
@@ -181,13 +228,21 @@ jobs:
       - name: Pull Docker images
         run: |
           ssh -i ~/.ssh/deploy_key \
-              -p ${{ inputs.ssh_port }} \
-              ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} << 'EOF'
+              -p ${{ steps.validate.outputs.ssh_port }} \
+              ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }} << 'EOF'
             cd ${{ steps.validate.outputs.deploy_path }}
             
             # Parse environment variables with proper shell escaping
-            # Validate keys and use @sh for safe shell quoting
+            # Merge non-secret environment_vars with secret deployment_secrets
             ENV_VARS='${{ inputs.environment_vars }}'
+            DEPLOYMENT_SECRETS='${{ secrets.deployment_secrets }}'
+            
+            # Merge JSON objects (secrets take precedence)
+            if [ -n "$DEPLOYMENT_SECRETS" ] && [ "$DEPLOYMENT_SECRETS" != "null" ]; then
+              MERGED_VARS=$(echo "$ENV_VARS" "$DEPLOYMENT_SECRETS" | jq -s '.[0] * .[1]')
+            else
+              MERGED_VARS="$ENV_VARS"
+            fi
             
             # Export environment variables safely using eval with jq's @sh formatter
             while IFS='=' read -r key value; do
@@ -197,7 +252,7 @@ jobs:
                 exit 1
               fi
               export "$key=$value"
-            done < <(echo "$ENV_VARS" | jq -r 'to_entries | .[] | "\(.key)=\(.value)"')
+            done < <(echo "$MERGED_VARS" | jq -r 'to_entries | .[] | "\(.key)=\(.value)"')
             
             echo "Pulling Docker images..."
             docker compose pull
@@ -207,13 +262,21 @@ jobs:
         id: deploy
         run: |
           ssh -i ~/.ssh/deploy_key \
-              -p ${{ inputs.ssh_port }} \
-              ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} << 'EOF'
+              -p ${{ steps.validate.outputs.ssh_port }} \
+              ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }} << 'EOF'
             cd ${{ steps.validate.outputs.deploy_path }}
             
             # Parse environment variables with proper shell escaping
-            # Validate keys and use @sh for safe shell quoting
+            # Merge non-secret environment_vars with secret deployment_secrets
             ENV_VARS='${{ inputs.environment_vars }}'
+            DEPLOYMENT_SECRETS='${{ secrets.deployment_secrets }}'
+            
+            # Merge JSON objects (secrets take precedence)
+            if [ -n "$DEPLOYMENT_SECRETS" ] && [ "$DEPLOYMENT_SECRETS" != "null" ]; then
+              MERGED_VARS=$(echo "$ENV_VARS" "$DEPLOYMENT_SECRETS" | jq -s '.[0] * .[1]')
+            else
+              MERGED_VARS="$ENV_VARS"
+            fi
             
             # Export environment variables safely using eval with jq's @sh formatter
             while IFS='=' read -r key value; do
@@ -223,14 +286,12 @@ jobs:
                 exit 1
               fi
               export "$key=$value"
-            done < <(echo "$ENV_VARS" | jq -r 'to_entries | .[] | "\(.key)=\(.value)"')
+            done < <(echo "$MERGED_VARS" | jq -r 'to_entries | .[] | "\(.key)=\(.value)"')
             
             SERVICE_NAME="${{ steps.validate.outputs.service_name }}"
             
             echo "Deploying stack: $SERVICE_NAME"
             docker stack deploy -c docker-compose.yml --prune --resolve-image always "$SERVICE_NAME"
-            
-            echo "Deployment command completed"
           EOF
 
       - name: Wait for services to be ready
@@ -239,12 +300,12 @@ jobs:
         timeout-minutes: 15
         run: |
           ssh -i ~/.ssh/deploy_key \
-              -p ${{ inputs.ssh_port }} \
-              ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} << 'EOF'
+              -p ${{ steps.validate.outputs.ssh_port }} \
+              ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }} << 'EOF'
             SERVICE_NAME="${{ steps.validate.outputs.service_name }}"
             TIMEOUT=${{ inputs.health_check_timeout }}
             
-            echo "Waiting for services to be ready (timeout: ${TIMEOUT}s)..."
+            echo "Waiting for services to be ready (timeout: ${TIMEOUT}s)"
             
             END_TIME=$(($(date +%s) + TIMEOUT))
             
@@ -275,7 +336,7 @@ jobs:
                 DESIRED=$(echo "$REPLICAS" | cut -d'/' -f2)
                 
                 if [ "$RUNNING" != "$DESIRED" ]; then
-                  echo "Service $SERVICE: $REPLICAS replicas"
+                  echo "Service $SERVICE: $REPLICAS replicas (not ready)"
                   ALL_READY=false
                 else
                   echo "Service $SERVICE: Ready ($REPLICAS)"
@@ -290,16 +351,26 @@ jobs:
               sleep 5
             done
             
-            echo "Timeout waiting for services to be ready"
-            docker stack ps "$SERVICE_NAME"
+            echo "ERROR: Timeout waiting for services to be ready"
+            echo "=== Final stack status ==="
+            docker stack ps "$SERVICE_NAME" --no-trunc
+            echo ""
+            echo "=== Service details ==="
+            docker stack services "$SERVICE_NAME"
+            echo ""
+            echo "=== Logs from services ==="
+            for SERVICE in $SERVICES; do
+              echo "--- Logs for $SERVICE ---"
+              docker service logs --tail 50 "$SERVICE" || echo "No logs available"
+            done
             exit 1
           EOF
 
       - name: Verify deployment
         run: |
           ssh -i ~/.ssh/deploy_key \
-              -p ${{ inputs.ssh_port }} \
-              ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} << 'EOF'
+              -p ${{ steps.validate.outputs.ssh_port }} \
+              ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }} << 'EOF'
             SERVICE_NAME="${{ steps.validate.outputs.service_name }}"
             
             echo "=== Stack Status ==="
@@ -325,8 +396,8 @@ jobs:
           echo "Deployment failed, initiating rollback..."
           
           ssh -i ~/.ssh/deploy_key \
-              -p ${{ inputs.ssh_port }} \
-              ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} << 'EOF'
+              -p ${{ steps.validate.outputs.ssh_port }} \
+              ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }} << 'EOF'
             BACKUP_DIR="${{ steps.backup.outputs.backup_dir }}"
             
             if [ -d "$BACKUP_DIR" ] && [ -f "$BACKUP_DIR/stack_name" ]; then
@@ -373,8 +444,8 @@ jobs:
         run: |
           # Cleanup old backups on server (keep last 5) - do this before removing SSH key
           ssh -i ~/.ssh/deploy_key \
-              -p ${{ inputs.ssh_port }} \
-              ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} << 'EOF' || true
+              -p ${{ steps.validate.outputs.ssh_port }} \
+              ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }} << 'EOF' || true
             cd /tmp
             ls -dt cloudlab-backup-* 2>/dev/null | tail -n +6 | xargs rm -rf 2>/dev/null || true
           EOF
@@ -389,10 +460,10 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Service:** ${{ steps.validate.outputs.service_name }}" >> $GITHUB_STEP_SUMMARY
           echo "**Deploy Path:** ${{ steps.validate.outputs.deploy_path }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Host:** ${{ inputs.ssh_host }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Host:** ${{ steps.validate.outputs.ssh_host }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Use the following command to check status:" >> $GITHUB_STEP_SUMMARY
           echo '```bash' >> $GITHUB_STEP_SUMMARY
-          echo "ssh -p ${{ inputs.ssh_port }} ${{ inputs.ssh_user }}@${{ inputs.ssh_host }}" >> $GITHUB_STEP_SUMMARY
+          echo "ssh -p ${{ steps.validate.outputs.ssh_port }} ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }}" >> $GITHUB_STEP_SUMMARY
           echo "docker stack ps ${{ steps.validate.outputs.service_name }}" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
