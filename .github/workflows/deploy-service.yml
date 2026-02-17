@@ -17,19 +17,20 @@ on:
         type: string
         default: '{}'
       ssh_host:
-        description: 'Cloudlab droplet hostname or IP address'
-        required: true
+        description: 'Cloudlab droplet hostname or IP address (deprecated: use secrets.ssh_host instead)'
+        required: false
         type: string
+        default: ''
       ssh_user:
-        description: 'SSH username for deployment'
+        description: 'SSH username for deployment (deprecated: use secrets.ssh_user instead, defaults to deployer)'
         required: false
         type: string
-        default: 'deployer'
+        default: ''
       ssh_port:
-        description: 'SSH port for deployment'
+        description: 'SSH port for deployment (deprecated: use secrets.ssh_port instead, defaults to 1923)'
         required: false
         type: string
-        default: '1923'
+        default: ''
       deploy_path:
         description: 'Deployment directory on the server (defaults to /opt/cloudlab/stacks/<service_name>)'
         required: false
@@ -53,6 +54,15 @@ on:
       ssh_key:
         description: 'SSH private key for deployment'
         required: true
+      ssh_host:
+        description: 'Cloudlab droplet hostname or IP address'
+        required: false
+      ssh_user:
+        description: 'SSH username for deployment'
+        required: false
+      ssh_port:
+        description: 'SSH port for deployment'
+        required: false
 
 jobs:
   deploy:
@@ -67,6 +77,34 @@ jobs:
       - name: Validate inputs
         id: validate
         run: |
+          # Set SSH connection parameters (prefer secrets over inputs)
+          SSH_HOST="${{ secrets.ssh_host }}"
+          SSH_USER="${{ secrets.ssh_user }}"
+          SSH_PORT="${{ secrets.ssh_port }}"
+          
+          # Fall back to inputs if secrets not provided
+          if [ -z "$SSH_HOST" ]; then
+            SSH_HOST="${{ steps.validate.outputs.ssh_host }}"
+          fi
+          if [ -z "$SSH_USER" ]; then
+            SSH_USER="${{ steps.validate.outputs.ssh_user }}"
+          fi
+          if [ -z "$SSH_PORT" ]; then
+            SSH_PORT="${{ steps.validate.outputs.ssh_port }}"
+          fi
+          
+          # Set defaults for optional parameters
+          if [ -z "$SSH_USER" ]; then
+            SSH_USER="deployer"
+          fi
+          if [ -z "$SSH_PORT" ]; then
+            SSH_PORT="1923"
+          fi
+          
+          echo "ssh_host=$SSH_HOST" >> $GITHUB_OUTPUT
+          echo "ssh_user=$SSH_USER" >> $GITHUB_OUTPUT
+          echo "ssh_port=$SSH_PORT" >> $GITHUB_OUTPUT
+          
           # Sanitize service name from repository name if not provided
           if [ -z "${{ inputs.service_name }}" ]; then
             # Extract repo name and sanitize (remove special chars, lowercase)
@@ -107,21 +145,21 @@ jobs:
           echo "Deployment configuration:"
           echo "  Service: $SERVICE_NAME"
           echo "  Deploy path: $DEPLOY_PATH"
-          echo "  SSH: ${{ inputs.ssh_user }}@${{ inputs.ssh_host }}:${{ inputs.ssh_port }}"
+          echo "  SSH: ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }}:${{ steps.validate.outputs.ssh_port }}"
 
       - name: Prepare SSH key
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.ssh_key }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -p ${{ inputs.ssh_port }} -H ${{ inputs.ssh_host }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          ssh-keyscan -p ${{ steps.validate.outputs.ssh_port }} -H ${{ steps.validate.outputs.ssh_host }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
       - name: Test SSH connectivity
         run: |
           ssh -i ~/.ssh/deploy_key \
-              -p ${{ inputs.ssh_port }} \
+              -p ${{ steps.validate.outputs.ssh_port }} \
               -o StrictHostKeyChecking=accept-new \
-              ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} \
+              ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }} \
               "echo 'SSH connection successful'"
 
       - name: Backup current deployment (for rollback)
@@ -132,8 +170,8 @@ jobs:
           echo "backup_dir=$BACKUP_DIR" >> $GITHUB_OUTPUT
           
           ssh -i ~/.ssh/deploy_key \
-              -p ${{ inputs.ssh_port }} \
-              ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} << EOF
+              -p ${{ steps.validate.outputs.ssh_port }} \
+              ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }} << EOF
             SERVICE_NAME="${{ steps.validate.outputs.service_name }}"
             DEPLOY_PATH="${{ steps.validate.outputs.deploy_path }}"
             BACKUP_DIR="$BACKUP_DIR"
@@ -160,22 +198,22 @@ jobs:
       - name: Prepare deployment directory
         run: |
           ssh -i ~/.ssh/deploy_key \
-              -p ${{ inputs.ssh_port }} \
-              ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} \
+              -p ${{ steps.validate.outputs.ssh_port }} \
+              ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }} \
               "mkdir -p ${{ steps.validate.outputs.deploy_path }}"
 
       - name: Copy docker-compose file
         run: |
           scp -i ~/.ssh/deploy_key \
-              -P ${{ inputs.ssh_port }} \
+              -P ${{ steps.validate.outputs.ssh_port }} \
               ${{ inputs.docker_compose_file }} \
-              ${{ inputs.ssh_user }}@${{ inputs.ssh_host }}:${{ steps.validate.outputs.deploy_path }}/docker-compose.yml
+              ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }}:${{ steps.validate.outputs.deploy_path }}/docker-compose.yml
 
       - name: Validate docker-compose syntax
         run: |
           ssh -i ~/.ssh/deploy_key \
-              -p ${{ inputs.ssh_port }} \
-              ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} << 'EOF'
+              -p ${{ steps.validate.outputs.ssh_port }} \
+              ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }} << 'EOF'
             cd ${{ steps.validate.outputs.deploy_path }}
             if ! docker compose config > /dev/null 2>&1; then
               echo "Error: Invalid docker-compose.yml syntax"
@@ -187,8 +225,8 @@ jobs:
       - name: Pull Docker images
         run: |
           ssh -i ~/.ssh/deploy_key \
-              -p ${{ inputs.ssh_port }} \
-              ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} << 'EOF'
+              -p ${{ steps.validate.outputs.ssh_port }} \
+              ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }} << 'EOF'
             cd ${{ steps.validate.outputs.deploy_path }}
             
             # Parse environment variables with proper shell escaping
@@ -213,8 +251,8 @@ jobs:
         id: deploy
         run: |
           ssh -i ~/.ssh/deploy_key \
-              -p ${{ inputs.ssh_port }} \
-              ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} << 'EOF'
+              -p ${{ steps.validate.outputs.ssh_port }} \
+              ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }} << 'EOF'
             cd ${{ steps.validate.outputs.deploy_path }}
             
             # Parse environment variables with proper shell escaping
@@ -245,8 +283,8 @@ jobs:
         timeout-minutes: 15
         run: |
           ssh -i ~/.ssh/deploy_key \
-              -p ${{ inputs.ssh_port }} \
-              ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} << 'EOF'
+              -p ${{ steps.validate.outputs.ssh_port }} \
+              ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }} << 'EOF'
             SERVICE_NAME="${{ steps.validate.outputs.service_name }}"
             TIMEOUT=${{ inputs.health_check_timeout }}
             
@@ -304,8 +342,8 @@ jobs:
       - name: Verify deployment
         run: |
           ssh -i ~/.ssh/deploy_key \
-              -p ${{ inputs.ssh_port }} \
-              ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} << 'EOF'
+              -p ${{ steps.validate.outputs.ssh_port }} \
+              ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }} << 'EOF'
             SERVICE_NAME="${{ steps.validate.outputs.service_name }}"
             
             echo "=== Stack Status ==="
@@ -331,8 +369,8 @@ jobs:
           echo "Deployment failed, initiating rollback..."
           
           ssh -i ~/.ssh/deploy_key \
-              -p ${{ inputs.ssh_port }} \
-              ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} << 'EOF'
+              -p ${{ steps.validate.outputs.ssh_port }} \
+              ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }} << 'EOF'
             BACKUP_DIR="${{ steps.backup.outputs.backup_dir }}"
             
             if [ -d "$BACKUP_DIR" ] && [ -f "$BACKUP_DIR/stack_name" ]; then
@@ -379,8 +417,8 @@ jobs:
         run: |
           # Cleanup old backups on server (keep last 5) - do this before removing SSH key
           ssh -i ~/.ssh/deploy_key \
-              -p ${{ inputs.ssh_port }} \
-              ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} << 'EOF' || true
+              -p ${{ steps.validate.outputs.ssh_port }} \
+              ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }} << 'EOF' || true
             cd /tmp
             ls -dt cloudlab-backup-* 2>/dev/null | tail -n +6 | xargs rm -rf 2>/dev/null || true
           EOF
@@ -395,10 +433,10 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Service:** ${{ steps.validate.outputs.service_name }}" >> $GITHUB_STEP_SUMMARY
           echo "**Deploy Path:** ${{ steps.validate.outputs.deploy_path }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Host:** ${{ inputs.ssh_host }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Host:** ${{ steps.validate.outputs.ssh_host }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Use the following command to check status:" >> $GITHUB_STEP_SUMMARY
           echo '```bash' >> $GITHUB_STEP_SUMMARY
-          echo "ssh -p ${{ inputs.ssh_port }} ${{ inputs.ssh_user }}@${{ inputs.ssh_host }}" >> $GITHUB_STEP_SUMMARY
+          echo "ssh -p ${{ steps.validate.outputs.ssh_port }} ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }}" >> $GITHUB_STEP_SUMMARY
           echo "docker stack ps ${{ steps.validate.outputs.service_name }}" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
