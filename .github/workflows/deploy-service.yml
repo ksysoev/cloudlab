@@ -127,7 +127,7 @@ jobs:
           
           # Set deployment path
           if [ -z "${{ inputs.deploy_path }}" ]; then
-            DEPLOY_PATH="/opt/cloudlab/stacks/$SERVICE_NAME"
+            DEPLOY_PATH="~/cloudlab/stacks/$SERVICE_NAME"
           else
             DEPLOY_PATH="${{ inputs.deploy_path }}"
           fi
@@ -203,7 +203,7 @@ jobs:
           ssh -i ~/.ssh/deploy_key \
               -p ${{ steps.validate.outputs.ssh_port }} \
               ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }} \
-              "sudo mkdir -p ${{ steps.validate.outputs.deploy_path }} && sudo chown -R ${{ steps.validate.outputs.ssh_user }}:${{ steps.validate.outputs.ssh_user }} /opt/cloudlab"
+              "mkdir -p ${{ steps.validate.outputs.deploy_path }}"
 
       - name: Copy docker-compose file
         run: |
