@@ -203,7 +203,7 @@ jobs:
           ssh -i ~/.ssh/deploy_key \
               -p ${{ steps.validate.outputs.ssh_port }} \
               ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }} \
-              "mkdir -p ${{ steps.validate.outputs.deploy_path }}"
+              "sudo mkdir -p ${{ steps.validate.outputs.deploy_path }} && sudo chown -R ${{ steps.validate.outputs.ssh_user }}:${{ steps.validate.outputs.ssh_user }} /opt/cloudlab"
 
       - name: Copy docker-compose file
         run: |
