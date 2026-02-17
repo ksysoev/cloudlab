@@ -264,12 +264,21 @@ jobs:
           ssh -i ~/.ssh/deploy_key \
               -p ${{ steps.validate.outputs.ssh_port }} \
               ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }} << 'EOF'
+            set -x  # Enable debug mode
             cd ${{ steps.validate.outputs.deploy_path }}
+            
+            echo "=== DEBUG: Current directory ==="
+            pwd
+            echo "=== DEBUG: Files in directory ==="
+            ls -la
             
             # Parse environment variables with proper shell escaping
             # Merge non-secret environment_vars with secret deployment_secrets
             ENV_VARS='${{ inputs.environment_vars }}'
             DEPLOYMENT_SECRETS='${{ secrets.deployment_secrets }}'
+            
+            echo "=== DEBUG: Environment variables (non-secret) ==="
+            echo "$ENV_VARS" | jq .
             
             # Merge JSON objects (secrets take precedence)
             if [ -n "$DEPLOYMENT_SECRETS" ] && [ "$DEPLOYMENT_SECRETS" != "null" ]; then
@@ -278,6 +287,9 @@ jobs:
               MERGED_VARS="$ENV_VARS"
             fi
             
+            echo "=== DEBUG: Merged variables count ==="
+            echo "$MERGED_VARS" | jq 'keys | length'
+            
             # Export environment variables safely using eval with jq's @sh formatter
             while IFS='=' read -r key value; do
               # Validate key is a valid environment variable name
@@ -285,13 +297,29 @@ jobs:
                 echo "Error: Invalid environment variable name: $key"
                 exit 1
               fi
+              echo "DEBUG: Exporting $key"
               export "$key=$value"
             done < <(echo "$MERGED_VARS" | jq -r 'to_entries | .[] | "\(.key)=\(.value)"')
             
             SERVICE_NAME="${{ steps.validate.outputs.service_name }}"
             
-            echo "Deploying stack: $SERVICE_NAME"
+            echo "=== DEBUG: Exported environment ==="
+            env | grep -E 'MIT_|NETWORK_|AUTH_|DOMAIN_|EMAIL|CLOUDFLARE' || echo "No matching env vars"
+            
+            echo "=== DEBUG: Docker Swarm status ==="
+            docker node ls
+            
+            echo "=== DEBUG: Existing stacks ==="
+            docker stack ls
+            
+            echo "=== DEBUG: Deploying stack: $SERVICE_NAME ==="
             docker stack deploy -c docker-compose.yml --prune --resolve-image always "$SERVICE_NAME"
+            
+            echo "=== DEBUG: Stack deployed, checking services ==="
+            docker stack services "$SERVICE_NAME" || echo "No services yet"
+            
+            echo "=== DEBUG: Stack tasks ==="
+            docker stack ps "$SERVICE_NAME" --no-trunc || echo "No tasks yet"
             
             echo "Deployment command completed"
           EOF
@@ -304,19 +332,31 @@ jobs:
           ssh -i ~/.ssh/deploy_key \
               -p ${{ steps.validate.outputs.ssh_port }} \
               ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }} << 'EOF'
+            set -x  # Enable debug mode
             SERVICE_NAME="${{ steps.validate.outputs.service_name }}"
             TIMEOUT=${{ inputs.health_check_timeout }}
             
-            echo "Waiting for services to be ready (timeout: ${TIMEOUT}s)..."
+            echo "=== DEBUG: Waiting for services to be ready (timeout: ${TIMEOUT}s) ==="
             
             END_TIME=$(($(date +%s) + TIMEOUT))
+            ITERATION=0
             
             while [ $(date +%s) -lt $END_TIME ]; do
+              ITERATION=$((ITERATION + 1))
+              ELAPSED=$(($(date +%s) - (END_TIME - TIMEOUT)))
+              
+              echo ""
+              echo "=== DEBUG: Iteration $ITERATION (${ELAPSED}s elapsed) ==="
+              
               # Get all services in the stack
               SERVICES=$(docker stack services "$SERVICE_NAME" --format "{{.Name}}" 2>/dev/null || true)
               
+              echo "DEBUG: Services found: $SERVICES"
+              
               if [ -z "$SERVICES" ]; then
                 echo "No services found yet, waiting..."
+                echo "DEBUG: Checking docker stack ls:"
+                docker stack ls
                 sleep 5
                 continue
               fi
@@ -326,6 +366,8 @@ jobs:
               for SERVICE in $SERVICES; do
                 # Get replicas status (e.g., "1/1" means 1 running out of 1 desired)
                 REPLICAS=$(docker service ls --filter "name=$SERVICE" --format "{{.Replicas}}" | head -n1)
+                
+                echo "DEBUG: Service $SERVICE replicas: '$REPLICAS'"
                 
                 if [ -z "$REPLICAS" ]; then
                   echo "Service $SERVICE: No replica info yet"
@@ -337,24 +379,43 @@ jobs:
                 RUNNING=$(echo "$REPLICAS" | cut -d'/' -f1)
                 DESIRED=$(echo "$REPLICAS" | cut -d'/' -f2)
                 
+                echo "DEBUG: Service $SERVICE - Running: $RUNNING, Desired: $DESIRED"
+                
                 if [ "$RUNNING" != "$DESIRED" ]; then
-                  echo "Service $SERVICE: $REPLICAS replicas"
+                  echo "Service $SERVICE: $REPLICAS replicas (not ready)"
                   ALL_READY=false
+                  
+                  # Show task details for services that aren't ready
+                  echo "DEBUG: Task details for $SERVICE:"
+                  docker service ps "$SERVICE" --no-trunc --format "table {{.ID}}\t{{.Name}}\t{{.Image}}\t{{.Node}}\t{{.DesiredState}}\t{{.CurrentState}}\t{{.Error}}" || true
                 else
                   echo "Service $SERVICE: Ready ($REPLICAS)"
                 fi
               done
               
               if [ "$ALL_READY" = true ]; then
-                echo "All services are ready!"
+                echo ""
+                echo "=== All services are ready! ==="
                 exit 0
               fi
               
+              echo "DEBUG: Not all services ready, sleeping 5s..."
               sleep 5
             done
             
-            echo "Timeout waiting for services to be ready"
-            docker stack ps "$SERVICE_NAME"
+            echo ""
+            echo "=== ERROR: Timeout waiting for services to be ready ==="
+            echo "=== Final stack status: ==="
+            docker stack ps "$SERVICE_NAME" --no-trunc
+            echo ""
+            echo "=== Service details: ==="
+            docker stack services "$SERVICE_NAME"
+            echo ""
+            echo "=== Logs from failed services: ==="
+            for SERVICE in $SERVICES; do
+              echo "--- Logs for $SERVICE ---"
+              docker service logs --tail 50 "$SERVICE" || echo "No logs available"
+            done
             exit 1
           EOF
 
