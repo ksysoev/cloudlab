@@ -85,3 +85,16 @@ variable "tags" {
   type        = list(string)
   default     = ["cloudlab", "swarm", "terraform"]
 }
+
+# Cloudflare configuration
+variable "cloudflare_api_token" {
+  description = "Cloudflare API token for DNS management"
+  type        = string
+  sensitive   = true
+}
+
+variable "cloudflare_zone_name" {
+  description = "Cloudflare zone name (domain)"
+  type        = string
+  default     = "make-it-public.dev"
+}
