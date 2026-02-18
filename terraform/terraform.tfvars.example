@@ -47,3 +47,13 @@ grafana_cloud_api_key     = "" # Shared API key
 
 # Tags for organizing resources
 tags = ["cloudlab", "swarm", "terraform", "production"]
+
+# Cloudflare DNS configuration
+# Get API token from: https://dash.cloudflare.com/profile/api-tokens
+# Required permissions: Zone.DNS (Edit)
+# Recommended: Use "Edit zone DNS" template
+cloudflare_api_token = "your_cloudflare_api_token_here"
+
+# Domain name hosted on Cloudflare
+# This must match your Cloudflare zone exactly
+cloudflare_zone_name = "make-it-public.dev"

@@ -56,3 +56,19 @@ output "backups_enabled" {
   description = "Whether weekly backups are enabled for the droplet"
   value       = var.backups_enabled
 }
+
+# Cloudflare DNS outputs
+output "cloudflare_zone_id" {
+  description = "Cloudflare zone ID"
+  value       = data.cloudflare_zone.main.id
+}
+
+output "dns_root_domain" {
+  description = "Root domain DNS record (not proxied for SSH access)"
+  value       = "${cloudflare_record.root.name == "@" ? var.cloudflare_zone_name : cloudflare_record.root.hostname} -> ${cloudflare_record.root.content} (proxied: ${cloudflare_record.root.proxied})"
+}
+
+output "dns_wildcard_domain" {
+  description = "Wildcard domain DNS record (proxied through Cloudflare)"
+  value       = "${cloudflare_record.wildcard.hostname} -> ${cloudflare_record.wildcard.content} (proxied: ${cloudflare_record.wildcard.proxied})"
+}
