@@ -26,6 +26,15 @@
     comment: "{{ item }} UDP"
   loop: "{{ firewall_allowed_udp_ports }}"
 
+- name: Allow ports from specific sources through UFW
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.port }}"
+    proto: "{{ item.proto }}"
+    from_ip: "{{ item.from }}"
+    comment: "{{ item.comment }}"
+  loop: "{{ firewall_allowed_from_sources | default([]) }}"
+
 - name: Enable UFW
   community.general.ufw:
     state: enabled

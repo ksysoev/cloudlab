@@ -27,9 +27,16 @@ firewall_allowed_tcp_ports:
   - "{{ ssh_port }}"
   - "80"
   - "443"
-  - "8081"
+  - "8081"  # MIT client connections
 firewall_allowed_udp_ports:
   - "443"
+
+# Firewall rules with source IP restrictions
+firewall_allowed_from_sources:
+  - port: "8082"
+    proto: tcp
+    from: "10.0.0.0/8"
+    comment: "8082 TCP for internal Docker services"
 
 # Docker
 docker_log_max_size: "10m"
