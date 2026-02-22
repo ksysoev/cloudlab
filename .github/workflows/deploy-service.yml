@@ -218,8 +218,9 @@ jobs:
               -p ${{ steps.validate.outputs.ssh_port }} \
               ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }} << 'EOF'
             cd ${{ steps.validate.outputs.deploy_path }}
-            if ! docker compose config > /dev/null 2>&1; then
+            if ! docker compose config --no-interpolate > /dev/null 2>&1; then
               echo "Error: Invalid docker-compose.yml syntax"
+              docker compose config --no-interpolate 2>&1 || true
               exit 1
             fi
             echo "Docker compose file validation successful"
