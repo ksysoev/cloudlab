@@ -39,6 +39,13 @@ resource "digitalocean_firewall" "swarm" {
     source_addresses = ["0.0.0.0/0", "::/0"]
   }
 
+  # make-it-public TCP edge server ports
+  inbound_rule {
+    protocol         = "tcp"
+    port_range       = "10000-10999"
+    source_addresses = ["0.0.0.0/0", "::/0"]
+  }
+
   # Allow all outbound traffic
   outbound_rule {
     protocol              = "tcp"

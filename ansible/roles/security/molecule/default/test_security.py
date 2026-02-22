@@ -65,3 +65,10 @@ def test_ssh_service_running(host):
     service = host.service("ssh")
     assert service.is_enabled, "SSH should be enabled"
     assert service.is_running, "SSH should be running"
+
+
+def test_ufw_tcp_port_range_rules(host):
+    """Test that UFW TCP port range rules are configured."""
+    ufw_status = host.run("ufw status")
+    assert ufw_status.rc == 0, "UFW should be running"
+    assert "10000:10999" in ufw_status.stdout, "TCP port range 10000:10999 should be allowed"

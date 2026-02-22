@@ -41,6 +41,9 @@ provisioner:
           - "8081"
         firewall_allowed_udp_ports:
           - "443"
+        firewall_allowed_tcp_port_ranges:
+          - range: "10000:10999"
+            comment: "make-it-public TCP edge server"
 
 verifier:
   name: testinfra
