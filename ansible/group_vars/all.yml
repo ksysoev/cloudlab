@@ -31,6 +31,11 @@ firewall_allowed_tcp_ports:
 firewall_allowed_udp_ports:
   - "443"
 
+# Firewall TCP port ranges (used for services requiring contiguous port blocks)
+firewall_allowed_tcp_port_ranges:
+  - range: "10000:10999"
+    comment: "make-it-public TCP edge server"
+
 # Firewall rules with source IP restrictions
 firewall_allowed_from_sources:
   - port: "8082"
