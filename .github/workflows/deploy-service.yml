@@ -256,7 +256,19 @@ jobs:
             done < <(echo "$MERGED_VARS" | jq -r 'to_entries | .[] | "\(.key)=\(.value)"')
             
             echo "Pulling Docker images..."
-            docker compose pull
+            # Use grep to extract image names from compose file instead of
+            # docker compose pull, which fails on port ranges in long-form
+            # syntax (e.g. target: 10000-10999). The deploy step uses
+            # docker stack deploy which parses these correctly.
+            while IFS= read -r image; do
+              # Strip surrounding quotes if present
+              image=$(echo "$image" | sed 's/^["'\'']\|["'\''"]$//g' | xargs)
+              [ -z "$image" ] && continue
+              # Expand environment variables in image references
+              expanded=$(eval echo "$image")
+              echo "Pulling $expanded..."
+              docker pull "$expanded"
+            done < <(grep -E '^\s+image:' docker-compose.yml | sed 's/^[^:]*:\s*//')
           EOF
 
       - name: Deploy to Docker Swarm
