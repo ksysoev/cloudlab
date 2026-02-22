@@ -260,15 +260,32 @@ jobs:
             # docker compose pull, which fails on port ranges in long-form
             # syntax (e.g. target: 10000-10999). The deploy step uses
             # docker stack deploy which parses these correctly.
+            PULL_FAILED=0
             while IFS= read -r image; do
-              # Strip surrounding quotes if present
-              image=$(echo "$image" | sed 's/^["'\'']\|["'\''"]$//g' | xargs)
+              # Strip surrounding quotes and whitespace
+              image=$(printf '%s\n' "$image" | tr -d '"' | xargs)
               [ -z "$image" ] && continue
-              # Expand environment variables in image references
-              expanded=$(eval echo "$image")
+              # Safely resolve ${VAR:-default} patterns using indirect
+              # variable expansion instead of eval to avoid command injection
+              while echo "$image" | grep -qE '\$\{[A-Za-z_][A-Za-z0-9_]*:-[^}]*\}'; do
+                match=$(echo "$image" | grep -oE '\$\{[A-Za-z_][A-Za-z0-9_]*:-[^}]*\}' | head -1)
+                var_name=$(echo "$match" | sed -E 's/\$\{([A-Za-z_][A-Za-z0-9_]*):-[^}]*\}/\1/')
+                default_val=$(echo "$match" | sed -E 's/\$\{[A-Za-z_][A-Za-z0-9_]*:-([^}]*)\}/\1/')
+                var_val="${!var_name:-$default_val}"
+                image="${image/$match/$var_val}"
+              done
+              # Expand remaining simple ${VAR} references
+              expanded=$(printf '%s\n' "$image" | envsubst)
               echo "Pulling $expanded..."
-              docker pull "$expanded"
-            done < <(grep -E '^\s+image:' docker-compose.yml | sed 's/^[^:]*:\s*//')
+              if ! docker pull "$expanded"; then
+                echo "Error: Failed to pull $expanded"
+                PULL_FAILED=1
+              fi
+            done < <(grep -E '^[[:space:]]+image:' docker-compose.yml | sed 's/^[^:]*:[[:space:]]*//')
+            if [ "$PULL_FAILED" -ne 0 ]; then
+              echo "Error: One or more images failed to pull"
+              exit 1
+            fi
           EOF
 
       - name: Deploy to Docker Swarm
