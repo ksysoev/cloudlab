@@ -47,7 +47,7 @@ jobs:
           ansible-galaxy collection install -r requirements.yml
 
       - name: Setup Terraform for dynamic inventory
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: '1.9.0'
           cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
