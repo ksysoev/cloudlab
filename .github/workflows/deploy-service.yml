@@ -235,9 +235,9 @@ jobs:
       - name: Pull Docker images
         run: |
           # Resolve registry username on the runner side.
-          # Note: GHCR_USER is passed as a positional arg (non-secret), while the
-          # token and JSON payloads are transmitted via stdin to avoid both process-
-          # listing exposure and shell quoting issues with JSON values.
+          # All data (token, username, JSON payloads) is transmitted via stdin to
+          # avoid process-listing exposure and shell quoting issues with JSON values.
+          # Only DEPLOY_PATH is passed as a positional arg — it is not a secret.
           GHCR_USER="${{ secrets.ghcr_username }}"
           if [ -z "$GHCR_USER" ]; then
             GHCR_USER="${{ github.actor }}"
@@ -281,6 +281,8 @@ jobs:
             LOGGED_IN=true
           fi
 
+          # Expand a leading ~ to $HOME — tilde is not expanded inside variables
+          DEPLOY_PATH="${DEPLOY_PATH/#\~/$HOME}"
           cd "$DEPLOY_PATH"
 
           # Merge non-secret environment_vars with secret deployment_secrets
@@ -311,12 +313,19 @@ jobs:
           SCRIPT
 
           # Copy the script to the server
-          REMOTE_SCRIPT="/tmp/pull-script-$$.sh"
+          # Use run ID + attempt for a globally unique name; avoids collisions
+          # between concurrent runs targeting the same deployment server.
+          REMOTE_SCRIPT="/tmp/pull-script-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.sh"
           scp -i ~/.ssh/deploy_key \
               -P ${{ steps.validate.outputs.ssh_port }} \
               "$SCRIPT_FILE" \
               ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }}:"$REMOTE_SCRIPT"
           rm -f "$SCRIPT_FILE"
+
+          # Compact JSON to single lines with jq -c before sending so that
+          # multiline/pretty-printed payloads don't break the remote read -r calls.
+          ENV_VARS_COMPACT=$(printf '%s' '${{ inputs.environment_vars }}' | jq -c .)
+          DEPLOYMENT_SECRETS_COMPACT=$(printf '%s' '${{ secrets.deployment_secrets }}' | jq -c . 2>/dev/null || echo '{}')
 
           # Stream all data via stdin (one value per line) so nothing sensitive
           # or JSON-encoded appears in the remote process argument list.
@@ -324,8 +333,8 @@ jobs:
           {
             printf '%s\n' "$GHCR_TOKEN"
             printf '%s\n' "$GHCR_USER"
-            printf '%s\n' '${{ inputs.environment_vars }}'
-            printf '%s\n' '${{ secrets.deployment_secrets }}'
+            printf '%s\n' "$ENV_VARS_COMPACT"
+            printf '%s\n' "$DEPLOYMENT_SECRETS_COMPACT"
           } | ssh -i ~/.ssh/deploy_key \
               -p ${{ steps.validate.outputs.ssh_port }} \
               ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }} \
