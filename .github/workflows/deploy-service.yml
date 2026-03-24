@@ -66,6 +66,12 @@ on:
       deployment_secrets:
         description: 'JSON object of secret environment variables for deployment (alternative to environment_vars for secrets)'
         required: false
+      ghcr_token:
+        description: 'GitHub PAT or token with read:packages scope for pulling private images from ghcr.io'
+        required: false
+      ghcr_username:
+        description: 'Username for ghcr.io login (defaults to github.actor)'
+        required: false
 
 jobs:
   deploy:
@@ -228,36 +234,135 @@ jobs:
 
       - name: Pull Docker images
         run: |
+          # Resolve registry username on the runner side.
+          # All data (token, username, JSON payloads) is transmitted via stdin to
+          # avoid process-listing exposure and shell quoting issues with JSON values.
+          # Only DEPLOY_PATH is passed as a positional arg — it is not a secret.
+          GHCR_USER="${{ secrets.ghcr_username }}"
+          if [ -z "$GHCR_USER" ]; then
+            GHCR_USER="${{ github.actor }}"
+          fi
+          GHCR_TOKEN="${{ secrets.ghcr_token }}"
+
+          # Write the remote pull script to a temp file on the runner.
+          # Stdin protocol (one value per line):
+          #   line 1 — ghcr_token        (empty when not provided)
+          #   line 2 — ghcr_username
+          #   line 3 — environment_vars  (JSON)
+          #   line 4 — deployment_secrets (JSON)
+          #
+          # An isolated DOCKER_CONFIG dir scopes credentials to this session.
+          # The trap guarantees logout + removal on exit, error, or cancellation.
+          SCRIPT_FILE=$(mktemp /tmp/pull-script-XXXXXX.sh)
+          cat > "$SCRIPT_FILE" << 'SCRIPT'
+          set -euo pipefail
+          DEPLOY_PATH="$1"
+
+          # Read all data from stdin — nothing sensitive in argv
+          read -r GHCR_TOKEN_REMOTE
+          read -r GHCR_USER
+          read -r ENV_VARS
+          read -r DEPLOYMENT_SECRETS
+
+          CFG_DIR=$(mktemp -d /tmp/docker-cfg-XXXXXX)
+          LOGGED_IN=false
+
+          cleanup() {
+            if [ "$LOGGED_IN" = true ]; then
+              DOCKER_CONFIG="$CFG_DIR" docker logout ghcr.io 2>/dev/null || true
+            fi
+            rm -rf "$CFG_DIR"
+          }
+          trap cleanup EXIT
+
+          if [ -n "$GHCR_TOKEN_REMOTE" ] && [ -n "$GHCR_USER" ]; then
+            printf '%s\n' "$GHCR_TOKEN_REMOTE" | \
+              DOCKER_CONFIG="$CFG_DIR" docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            LOGGED_IN=true
+          fi
+
+          # Expand a leading ~ to $HOME — tilde is not expanded inside variables
+          DEPLOY_PATH="${DEPLOY_PATH/#\~/$HOME}"
+          cd "$DEPLOY_PATH"
+
+          # Merge non-secret environment_vars with secret deployment_secrets
+          if [ -n "$DEPLOYMENT_SECRETS" ] && [ "$DEPLOYMENT_SECRETS" != "null" ]; then
+            MERGED_VARS=$(printf '%s\n' "$ENV_VARS" "$DEPLOYMENT_SECRETS" | jq -s '.[0] * .[1]')
+          else
+            MERGED_VARS="$ENV_VARS"
+          fi
+
+          # Export environment variables safely
+          while IFS='=' read -r key value; do
+            if [[ ! "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+              echo "Error: Invalid environment variable name: $key"
+              exit 1
+            fi
+            export "$key=$value"
+          done < <(echo "$MERGED_VARS" | jq -r 'to_entries | .[] | "\(.key)=\(.value)"')
+
+          echo "Pulling Docker images..."
+          # Only use the isolated config dir when we are actually logged in;
+          # otherwise fall back to the server's default config so pre-existing
+          # credentials for other registries remain available.
+          if [ "$LOGGED_IN" = true ]; then
+            DOCKER_CONFIG="$CFG_DIR" docker compose pull
+          else
+            docker compose pull
+          fi
+          SCRIPT
+
+          # Copy the script to the server
+          # Use run ID + attempt for a globally unique name; avoids collisions
+          # between concurrent runs targeting the same deployment server.
+          REMOTE_SCRIPT="/tmp/pull-script-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.sh"
+          scp -i ~/.ssh/deploy_key \
+              -P ${{ steps.validate.outputs.ssh_port }} \
+              "$SCRIPT_FILE" \
+              ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }}:"$REMOTE_SCRIPT"
+          rm -f "$SCRIPT_FILE"
+
+          # Compact JSON to single lines with jq -c before sending so that
+          # multiline/pretty-printed payloads don't break the remote read -r calls.
+          # Heredoc delimiters are quoted ('JSON_...') so the shell does not
+          # interpret any characters in the body, while Actions still expands
+          # ${{ }} expressions before the shell runs. This handles JSON values
+          # that contain single quotes without breaking shell parsing.
+          ENV_VARS_COMPACT=$(cat << 'JSON_ENV_VARS' | jq -c .
+${{ inputs.environment_vars }}
+JSON_ENV_VARS
+          )
+          DEPLOYMENT_SECRETS_COMPACT=$(cat << 'JSON_DEPLOYMENT_SECRETS' | jq -c . 2>/dev/null || echo '{}'
+${{ secrets.deployment_secrets }}
+JSON_DEPLOYMENT_SECRETS
+          )
+
+          # Stream all data via stdin (one value per line) so nothing sensitive
+          # or JSON-encoded appears in the remote process argument list.
+          # Only DEPLOY_PATH is a positional arg — it is not a secret.
+          #
+          # SSH_EXIT=0 + || SSH_EXIT=$? prevents set -e from aborting the step
+          # on SSH failure so the cleanup ssh call always runs.
+          SSH_EXIT=0
+          {
+            printf '%s\n' "$GHCR_TOKEN"
+            printf '%s\n' "$GHCR_USER"
+            printf '%s\n' "$ENV_VARS_COMPACT"
+            printf '%s\n' "$DEPLOYMENT_SECRETS_COMPACT"
+          } | ssh -i ~/.ssh/deploy_key \
+              -p ${{ steps.validate.outputs.ssh_port }} \
+              ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }} \
+              bash "$REMOTE_SCRIPT" \
+                '${{ steps.validate.outputs.deploy_path }}' \
+            || SSH_EXIT=$?
+
+          # Always clean up the remote script file
           ssh -i ~/.ssh/deploy_key \
               -p ${{ steps.validate.outputs.ssh_port }} \
-              ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }} << 'EOF'
-            cd ${{ steps.validate.outputs.deploy_path }}
-            
-            # Parse environment variables with proper shell escaping
-            # Merge non-secret environment_vars with secret deployment_secrets
-            ENV_VARS='${{ inputs.environment_vars }}'
-            DEPLOYMENT_SECRETS='${{ secrets.deployment_secrets }}'
-            
-            # Merge JSON objects (secrets take precedence)
-            if [ -n "$DEPLOYMENT_SECRETS" ] && [ "$DEPLOYMENT_SECRETS" != "null" ]; then
-              MERGED_VARS=$(echo "$ENV_VARS" "$DEPLOYMENT_SECRETS" | jq -s '.[0] * .[1]')
-            else
-              MERGED_VARS="$ENV_VARS"
-            fi
-            
-            # Export environment variables safely using eval with jq's @sh formatter
-            while IFS='=' read -r key value; do
-              # Validate key is a valid environment variable name
-              if [[ ! "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
-                echo "Error: Invalid environment variable name: $key"
-                exit 1
-              fi
-              export "$key=$value"
-            done < <(echo "$MERGED_VARS" | jq -r 'to_entries | .[] | "\(.key)=\(.value)"')
-            
-            echo "Pulling Docker images..."
-            docker compose pull
-          EOF
+              ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }} \
+              "rm -f '$REMOTE_SCRIPT'" || true
+
+          exit $SSH_EXIT
 
       - name: Deploy to Docker Swarm
         id: deploy
