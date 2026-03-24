@@ -234,7 +234,10 @@ jobs:
 
       - name: Pull Docker images
         run: |
-          # Determine registry username (runner side — never reaches remote command line)
+          # Resolve registry username on the runner side.
+          # Note: GHCR_USER is passed as a positional arg (non-secret), while the
+          # token and JSON payloads are transmitted via stdin to avoid both process-
+          # listing exposure and shell quoting issues with JSON values.
           GHCR_USER="${{ secrets.ghcr_username }}"
           if [ -z "$GHCR_USER" ]; then
             GHCR_USER="${{ github.actor }}"
@@ -242,28 +245,40 @@ jobs:
           GHCR_TOKEN="${{ secrets.ghcr_token }}"
 
           # Write the remote pull script to a temp file on the runner.
-          # It is copied to the server and executed with the token streamed
-          # via SSH stdin — the token never appears in the remote process list
-          # or command arguments.
+          # Stdin protocol (one value per line):
+          #   line 1 — ghcr_token        (empty when not provided)
+          #   line 2 — ghcr_username
+          #   line 3 — environment_vars  (JSON)
+          #   line 4 — deployment_secrets (JSON)
           #
-          # An isolated DOCKER_CONFIG directory scopes credentials to this
-          # session only. The trap guarantees logout + removal even on error
-          # or mid-session cancellation.
+          # An isolated DOCKER_CONFIG dir scopes credentials to this session.
+          # The trap guarantees logout + removal on exit, error, or cancellation.
           SCRIPT_FILE=$(mktemp /tmp/pull-script-XXXXXX.sh)
           cat > "$SCRIPT_FILE" << 'SCRIPT'
           set -euo pipefail
-          GHCR_USER="$1"
-          DEPLOY_PATH="$2"
-          ENV_VARS="$3"
-          DEPLOYMENT_SECRETS="$4"
+          DEPLOY_PATH="$1"
+
+          # Read all data from stdin — nothing sensitive in argv
+          read -r GHCR_TOKEN_REMOTE
+          read -r GHCR_USER
+          read -r ENV_VARS
+          read -r DEPLOYMENT_SECRETS
 
           CFG_DIR=$(mktemp -d /tmp/docker-cfg-XXXXXX)
-          trap 'DOCKER_CONFIG="$CFG_DIR" docker logout ghcr.io 2>/dev/null || true; rm -rf "$CFG_DIR"' EXIT
+          LOGGED_IN=false
 
-          # Read the token from stdin (piped from the runner via printf | ssh)
-          GHCR_TOKEN_REMOTE=$(cat)
+          cleanup() {
+            if [ "$LOGGED_IN" = true ]; then
+              DOCKER_CONFIG="$CFG_DIR" docker logout ghcr.io 2>/dev/null || true
+            fi
+            rm -rf "$CFG_DIR"
+          }
+          trap cleanup EXIT
+
           if [ -n "$GHCR_TOKEN_REMOTE" ] && [ -n "$GHCR_USER" ]; then
-            printf '%s\n' "$GHCR_TOKEN_REMOTE" | DOCKER_CONFIG="$CFG_DIR" docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            printf '%s\n' "$GHCR_TOKEN_REMOTE" | \
+              DOCKER_CONFIG="$CFG_DIR" docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            LOGGED_IN=true
           fi
 
           cd "$DEPLOY_PATH"
@@ -285,7 +300,14 @@ jobs:
           done < <(echo "$MERGED_VARS" | jq -r 'to_entries | .[] | "\(.key)=\(.value)"')
 
           echo "Pulling Docker images..."
-          DOCKER_CONFIG="$CFG_DIR" docker compose pull
+          # Only use the isolated config dir when we are actually logged in;
+          # otherwise fall back to the server's default config so pre-existing
+          # credentials for other registries remain available.
+          if [ "$LOGGED_IN" = true ]; then
+            DOCKER_CONFIG="$CFG_DIR" docker compose pull
+          else
+            docker compose pull
+          fi
           SCRIPT
 
           # Copy the script to the server
@@ -296,16 +318,19 @@ jobs:
               ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }}:"$REMOTE_SCRIPT"
           rm -f "$SCRIPT_FILE"
 
-          # Pipe the token into stdin of the remote script.
-          # Positional args are passed as SSH command arguments — no secrets there.
-          printf '%s\n' "$GHCR_TOKEN" | ssh -i ~/.ssh/deploy_key \
+          # Stream all data via stdin (one value per line) so nothing sensitive
+          # or JSON-encoded appears in the remote process argument list.
+          # Only DEPLOY_PATH is a positional arg — it is not a secret.
+          {
+            printf '%s\n' "$GHCR_TOKEN"
+            printf '%s\n' "$GHCR_USER"
+            printf '%s\n' '${{ inputs.environment_vars }}'
+            printf '%s\n' '${{ secrets.deployment_secrets }}'
+          } | ssh -i ~/.ssh/deploy_key \
               -p ${{ steps.validate.outputs.ssh_port }} \
               ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }} \
               bash "$REMOTE_SCRIPT" \
-                "$GHCR_USER" \
-                '${{ steps.validate.outputs.deploy_path }}' \
-                '${{ inputs.environment_vars }}' \
-                '${{ secrets.deployment_secrets }}'; \
+                '${{ steps.validate.outputs.deploy_path }}'
           SSH_EXIT=$?
 
           # Always clean up the remote script file
