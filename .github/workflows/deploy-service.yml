@@ -232,50 +232,89 @@ jobs:
             echo "Docker compose file validation successful"
           EOF
 
-      - name: Log in to ghcr.io on server
-        if: ${{ secrets.ghcr_token != '' }}
+      - name: Pull Docker images
         run: |
+          # Determine registry username (runner side — never reaches remote command line)
           GHCR_USER="${{ secrets.ghcr_username }}"
           if [ -z "$GHCR_USER" ]; then
             GHCR_USER="${{ github.actor }}"
           fi
+          GHCR_TOKEN="${{ secrets.ghcr_token }}"
+
+          # Write the remote pull script to a temp file on the runner.
+          # It is copied to the server and executed with the token streamed
+          # via SSH stdin — the token never appears in the remote process list
+          # or command arguments.
+          #
+          # An isolated DOCKER_CONFIG directory scopes credentials to this
+          # session only. The trap guarantees logout + removal even on error
+          # or mid-session cancellation.
+          SCRIPT_FILE=$(mktemp /tmp/pull-script-XXXXXX.sh)
+          cat > "$SCRIPT_FILE" << 'SCRIPT'
+          set -euo pipefail
+          GHCR_USER="$1"
+          DEPLOY_PATH="$2"
+          ENV_VARS="$3"
+          DEPLOYMENT_SECRETS="$4"
+
+          CFG_DIR=$(mktemp -d /tmp/docker-cfg-XXXXXX)
+          trap 'DOCKER_CONFIG="$CFG_DIR" docker logout ghcr.io 2>/dev/null || true; rm -rf "$CFG_DIR"' EXIT
+
+          # Read the token from stdin (piped from the runner via printf | ssh)
+          GHCR_TOKEN_REMOTE=$(cat)
+          if [ -n "$GHCR_TOKEN_REMOTE" ] && [ -n "$GHCR_USER" ]; then
+            printf '%s\n' "$GHCR_TOKEN_REMOTE" | DOCKER_CONFIG="$CFG_DIR" docker login ghcr.io -u "$GHCR_USER" --password-stdin
+          fi
+
+          cd "$DEPLOY_PATH"
+
+          # Merge non-secret environment_vars with secret deployment_secrets
+          if [ -n "$DEPLOYMENT_SECRETS" ] && [ "$DEPLOYMENT_SECRETS" != "null" ]; then
+            MERGED_VARS=$(printf '%s\n' "$ENV_VARS" "$DEPLOYMENT_SECRETS" | jq -s '.[0] * .[1]')
+          else
+            MERGED_VARS="$ENV_VARS"
+          fi
+
+          # Export environment variables safely
+          while IFS='=' read -r key value; do
+            if [[ ! "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+              echo "Error: Invalid environment variable name: $key"
+              exit 1
+            fi
+            export "$key=$value"
+          done < <(echo "$MERGED_VARS" | jq -r 'to_entries | .[] | "\(.key)=\(.value)"')
+
+          echo "Pulling Docker images..."
+          DOCKER_CONFIG="$CFG_DIR" docker compose pull
+          SCRIPT
+
+          # Copy the script to the server
+          REMOTE_SCRIPT="/tmp/pull-script-$$.sh"
+          scp -i ~/.ssh/deploy_key \
+              -P ${{ steps.validate.outputs.ssh_port }} \
+              "$SCRIPT_FILE" \
+              ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }}:"$REMOTE_SCRIPT"
+          rm -f "$SCRIPT_FILE"
+
+          # Pipe the token into stdin of the remote script.
+          # Positional args are passed as SSH command arguments — no secrets there.
+          printf '%s\n' "$GHCR_TOKEN" | ssh -i ~/.ssh/deploy_key \
+              -p ${{ steps.validate.outputs.ssh_port }} \
+              ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }} \
+              bash "$REMOTE_SCRIPT" \
+                "$GHCR_USER" \
+                '${{ steps.validate.outputs.deploy_path }}' \
+                '${{ inputs.environment_vars }}' \
+                '${{ secrets.deployment_secrets }}'; \
+          SSH_EXIT=$?
+
+          # Always clean up the remote script file
           ssh -i ~/.ssh/deploy_key \
               -p ${{ steps.validate.outputs.ssh_port }} \
               ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }} \
-              "echo '${{ secrets.ghcr_token }}' | docker login ghcr.io -u '$GHCR_USER' --password-stdin"
+              "rm -f '$REMOTE_SCRIPT'" || true
 
-      - name: Pull Docker images
-        run: |
-          ssh -i ~/.ssh/deploy_key \
-              -p ${{ steps.validate.outputs.ssh_port }} \
-              ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }} << 'EOF'
-            cd ${{ steps.validate.outputs.deploy_path }}
-            
-            # Parse environment variables with proper shell escaping
-            # Merge non-secret environment_vars with secret deployment_secrets
-            ENV_VARS='${{ inputs.environment_vars }}'
-            DEPLOYMENT_SECRETS='${{ secrets.deployment_secrets }}'
-            
-            # Merge JSON objects (secrets take precedence)
-            if [ -n "$DEPLOYMENT_SECRETS" ] && [ "$DEPLOYMENT_SECRETS" != "null" ]; then
-              MERGED_VARS=$(echo "$ENV_VARS" "$DEPLOYMENT_SECRETS" | jq -s '.[0] * .[1]')
-            else
-              MERGED_VARS="$ENV_VARS"
-            fi
-            
-            # Export environment variables safely using eval with jq's @sh formatter
-            while IFS='=' read -r key value; do
-              # Validate key is a valid environment variable name
-              if [[ ! "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
-                echo "Error: Invalid environment variable name: $key"
-                exit 1
-              fi
-              export "$key=$value"
-            done < <(echo "$MERGED_VARS" | jq -r 'to_entries | .[] | "\(.key)=\(.value)"')
-            
-            echo "Pulling Docker images..."
-            docker compose pull
-          EOF
+          exit $SSH_EXIT
 
       - name: Deploy to Docker Swarm
         id: deploy
@@ -461,14 +500,6 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          # Log out from ghcr.io on server if we logged in
-          if [ -n "${{ secrets.ghcr_token }}" ]; then
-            ssh -i ~/.ssh/deploy_key \
-                -p ${{ steps.validate.outputs.ssh_port }} \
-                ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }} \
-                "docker logout ghcr.io" || true
-          fi
-
           # Cleanup old backups on server (keep last 5) - do this before removing SSH key
           ssh -i ~/.ssh/deploy_key \
               -p ${{ steps.validate.outputs.ssh_port }} \
