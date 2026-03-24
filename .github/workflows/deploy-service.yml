@@ -66,6 +66,12 @@ on:
       deployment_secrets:
         description: 'JSON object of secret environment variables for deployment (alternative to environment_vars for secrets)'
         required: false
+      ghcr_token:
+        description: 'GitHub PAT or token with read:packages scope for pulling private images from ghcr.io'
+        required: false
+      ghcr_username:
+        description: 'Username for ghcr.io login (defaults to github.actor)'
+        required: false
 
 jobs:
   deploy:
@@ -225,6 +231,18 @@ jobs:
             fi
             echo "Docker compose file validation successful"
           EOF
+
+      - name: Log in to ghcr.io on server
+        if: ${{ secrets.ghcr_token != '' }}
+        run: |
+          GHCR_USER="${{ secrets.ghcr_username }}"
+          if [ -z "$GHCR_USER" ]; then
+            GHCR_USER="${{ github.actor }}"
+          fi
+          ssh -i ~/.ssh/deploy_key \
+              -p ${{ steps.validate.outputs.ssh_port }} \
+              ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }} \
+              "echo '${{ secrets.ghcr_token }}' | docker login ghcr.io -u '$GHCR_USER' --password-stdin"
 
       - name: Pull Docker images
         run: |
@@ -443,6 +461,14 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
+          # Log out from ghcr.io on server if we logged in
+          if [ -n "${{ secrets.ghcr_token }}" ]; then
+            ssh -i ~/.ssh/deploy_key \
+                -p ${{ steps.validate.outputs.ssh_port }} \
+                ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }} \
+                "docker logout ghcr.io" || true
+          fi
+
           # Cleanup old backups on server (keep last 5) - do this before removing SSH key
           ssh -i ~/.ssh/deploy_key \
               -p ${{ steps.validate.outputs.ssh_port }} \
