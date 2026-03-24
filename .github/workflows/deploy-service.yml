@@ -324,12 +324,26 @@ jobs:
 
           # Compact JSON to single lines with jq -c before sending so that
           # multiline/pretty-printed payloads don't break the remote read -r calls.
-          ENV_VARS_COMPACT=$(printf '%s' '${{ inputs.environment_vars }}' | jq -c .)
-          DEPLOYMENT_SECRETS_COMPACT=$(printf '%s' '${{ secrets.deployment_secrets }}' | jq -c . 2>/dev/null || echo '{}')
+          # Heredoc delimiters are quoted ('JSON_...') so the shell does not
+          # interpret any characters in the body, while Actions still expands
+          # ${{ }} expressions before the shell runs. This handles JSON values
+          # that contain single quotes without breaking shell parsing.
+          ENV_VARS_COMPACT=$(cat << 'JSON_ENV_VARS' | jq -c .
+${{ inputs.environment_vars }}
+JSON_ENV_VARS
+          )
+          DEPLOYMENT_SECRETS_COMPACT=$(cat << 'JSON_DEPLOYMENT_SECRETS' | jq -c . 2>/dev/null || echo '{}'
+${{ secrets.deployment_secrets }}
+JSON_DEPLOYMENT_SECRETS
+          )
 
           # Stream all data via stdin (one value per line) so nothing sensitive
           # or JSON-encoded appears in the remote process argument list.
           # Only DEPLOY_PATH is a positional arg — it is not a secret.
+          #
+          # SSH_EXIT=0 + || SSH_EXIT=$? prevents set -e from aborting the step
+          # on SSH failure so the cleanup ssh call always runs.
+          SSH_EXIT=0
           {
             printf '%s\n' "$GHCR_TOKEN"
             printf '%s\n' "$GHCR_USER"
@@ -339,8 +353,8 @@ jobs:
               -p ${{ steps.validate.outputs.ssh_port }} \
               ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }} \
               bash "$REMOTE_SCRIPT" \
-                '${{ steps.validate.outputs.deploy_path }}'
-          SSH_EXIT=$?
+                '${{ steps.validate.outputs.deploy_path }}' \
+            || SSH_EXIT=$?
 
           # Always clean up the remote script file
           ssh -i ~/.ssh/deploy_key \
