@@ -233,16 +233,21 @@ jobs:
           EOF
 
       - name: Pull Docker images
+        env:
+          GHCR_TOKEN_INPUT: ${{ secrets.ghcr_token }}
+          GHCR_USERNAME_INPUT: ${{ secrets.ghcr_username }}
+          ENV_VARS_RAW: ${{ inputs.environment_vars }}
+          DEPLOYMENT_SECRETS_RAW: ${{ secrets.deployment_secrets }}
         run: |
           # Resolve registry username on the runner side.
           # All data (token, username, JSON payloads) is transmitted via stdin to
           # avoid process-listing exposure and shell quoting issues with JSON values.
           # Only DEPLOY_PATH is passed as a positional arg — it is not a secret.
-          GHCR_USER="${{ secrets.ghcr_username }}"
+          GHCR_USER="$GHCR_USERNAME_INPUT"
           if [ -z "$GHCR_USER" ]; then
             GHCR_USER="${{ github.actor }}"
           fi
-          GHCR_TOKEN="${{ secrets.ghcr_token }}"
+          GHCR_TOKEN="$GHCR_TOKEN_INPUT"
 
           # Write the remote pull script to a temp file on the runner.
           # Stdin protocol (one value per line):
@@ -324,18 +329,10 @@ jobs:
 
           # Compact JSON to single lines with jq -c before sending so that
           # multiline/pretty-printed payloads don't break the remote read -r calls.
-          # Heredoc delimiters are quoted ('JSON_...') so the shell does not
-          # interpret any characters in the body, while Actions still expands
-          # ${{ }} expressions before the shell runs. This handles JSON values
-          # that contain single quotes without breaking shell parsing.
-          ENV_VARS_COMPACT=$(cat << 'JSON_ENV_VARS' | jq -c .
-${{ inputs.environment_vars }}
-JSON_ENV_VARS
-          )
-          DEPLOYMENT_SECRETS_COMPACT=$(cat << 'JSON_DEPLOYMENT_SECRETS' | jq -c . 2>/dev/null || echo '{}'
-${{ secrets.deployment_secrets }}
-JSON_DEPLOYMENT_SECRETS
-          )
+          # Values are read from env vars (set in the step's env: block) so that
+          # single quotes inside JSON values don't break shell parsing.
+          ENV_VARS_COMPACT=$(printf '%s' "$ENV_VARS_RAW" | jq -c .)
+          DEPLOYMENT_SECRETS_COMPACT=$(printf '%s' "$DEPLOYMENT_SECRETS_RAW" | jq -c . 2>/dev/null || echo '{}')
 
           # Stream all data via stdin (one value per line) so nothing sensitive
           # or JSON-encoded appears in the remote process argument list.
