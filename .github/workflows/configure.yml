@@ -94,10 +94,12 @@ jobs:
         working-directory: .
         run: |
           ssh-keygen -y -f ~/.ssh/id_rsa > ~/.ssh/id_rsa.pub
-          # Write to a YAML vars file so Ansible receives the full key string
-          # without whitespace splitting that -e "key=value" would cause.
-          echo "deployer_ssh_public_key: \"$(cat ~/.ssh/id_rsa.pub)\"" \
-            > /tmp/bootstrap_vars.yml
+          # Write as a YAML block scalar — avoids any quoting issues with
+          # double-quoted strings if the key comment contains special chars.
+          {
+            echo "deployer_ssh_public_key: |"
+            echo "  $(cat ~/.ssh/id_rsa.pub)"
+          } > /tmp/bootstrap_vars.yml
 
       - name: Run Ansible playbook (check mode)
         run: |

@@ -1,10 +1,4 @@
 ---
-- name: Reboot server
-  ansible.builtin.reboot:
-    reboot_timeout: 300
-  vars:
-    # Reconnect as deployer after reboot — by this point the deployer user,
-    # SSH key, and sudo access have all been set up by the bootstrap tasks.
-    # Root login will be disabled by bootstrap.conf (PermitRootLogin no),
-    # so the reboot wait must use the deployer account instead.
-    ansible_user: deployer
+# No handlers — bootstrap uses an unconditional reboot task at the end of
+# tasks/main.yml so the custom SSH port is always activated regardless of
+# whether apt dist-upgrade found anything to upgrade.

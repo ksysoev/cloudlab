@@ -11,7 +11,6 @@
   ansible.builtin.apt:
     update_cache: true
     upgrade: dist
-  notify: Reboot server
 
 - name: Install bootstrap dependencies
   ansible.builtin.apt:
@@ -61,3 +60,16 @@
     mode: '0644'
     owner: root
     group: root
+  # Port 22 is intentionally kept open here alongside the custom port so
+  # Ansible can reconnect after the reboot below. The security role removes
+  # bootstrap.conf and writes custom_port.conf (custom port only), closing
+  # port 22 once deployer access on the custom port is confirmed.
+
+- name: Reboot to apply updates and activate SSH configuration
+  ansible.builtin.reboot:
+    reboot_timeout: 300
+  become: true
+  vars:
+    # Reconnect as deployer — root login is disabled by bootstrap.conf
+    # (PermitRootLogin no) which sshd loads on the way back up.
+    ansible_user: deployer
