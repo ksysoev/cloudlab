@@ -8,8 +8,3 @@
     # Root login will be disabled by bootstrap.conf (PermitRootLogin no),
     # so the reboot wait must use the deployer account instead.
     ansible_user: deployer
-
-- name: Restart ssh
-  ansible.builtin.systemd:
-    name: ssh
-    state: restarted

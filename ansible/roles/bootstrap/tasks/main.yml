@@ -3,14 +3,9 @@
 # Runs once on fresh droplets as root before the deployer user exists.
 # Subsequent configuration is handled by other roles via the deployer user.
 
-- name: Ensure Python 3 is available
-  ansible.builtin.raw: >
-    test -x /usr/bin/python3 ||
-    (apt-get update -qq &&
-    apt-get install -y -qq python3 &&
-    echo "python3 installed")
-  register: bootstrap_python_check
-  changed_when: "'python3 installed' in bootstrap_python_check.stdout"
+- name: Ensure Python 3 and apt bindings are available
+  ansible.builtin.raw: apt-get install -y -qq python3 python3-apt
+  changed_when: false
 
 - name: Update apt cache and upgrade packages
   ansible.builtin.apt:
@@ -66,4 +61,3 @@
     mode: '0644'
     owner: root
     group: root
-  notify: Restart ssh
