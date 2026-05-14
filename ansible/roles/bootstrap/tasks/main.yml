@@ -7,6 +7,16 @@
   ansible.builtin.raw: apt-get install -y -qq python3 python3-apt
   changed_when: false
 
+- name: Assert required variables are provided
+  ansible.builtin.assert:
+    that:
+      - deployer_ssh_public_key | length > 0
+      - ssh_port | int > 0
+    fail_msg: >-
+      bootstrap role requires deployer_ssh_public_key (non-empty) and
+      ssh_port (positive integer). Set them via group_vars or
+      -e @/tmp/bootstrap_vars.yml.
+
 - name: Update apt cache and upgrade packages
   ansible.builtin.apt:
     update_cache: true

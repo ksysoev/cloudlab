@@ -19,6 +19,7 @@
     - name: Check if deployer user exists
       ansible.builtin.raw: id deployer
       register: deployer_check
+      become: false
       failed_when: false
       changed_when: false
 
@@ -28,17 +29,6 @@
         deployer_check.rc is defined
         and deployer_check.rc != 0
       tags: [bootstrap]
-
-  post_tasks:
-    - name: Warn if bootstrap was skipped due to unreachable host
-      ansible.builtin.debug:
-        msg: >-
-          Bootstrap skipped: host was unreachable on port 22.
-          If this is a fresh droplet the next play will fail on
-          port 1923 — re-run once the droplet is fully booted.
-      when: >
-        deployer_check is not defined or
-        deployer_check.rc is not defined
 
 - name: Configure CloudLab Swarm Infrastructure
   hosts: swarm

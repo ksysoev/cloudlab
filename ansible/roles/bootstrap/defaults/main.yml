@@ -1,0 +1,11 @@
+---
+# Required: SSH public key injected into the deployer user's authorized_keys.
+# Must be provided via -e @/tmp/bootstrap_vars.yml in CI or overridden in
+# group_vars. An empty string will cause the assert in tasks/main.yml to
+# fail fast with a clear message.
+deployer_ssh_public_key: ""
+
+# Required: Custom SSH port sshd will listen on after bootstrap.
+# bootstrap.conf opens both port 22 and this port; the security role later
+# removes bootstrap.conf and switches to this port exclusively.
+ssh_port: 1923
