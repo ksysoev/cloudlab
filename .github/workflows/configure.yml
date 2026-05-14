@@ -62,14 +62,17 @@ jobs:
         run: |
           DROPLET_IP=$(cd terraform && terraform output -raw droplet_ip)
           SSH_PORT="${{ secrets.SWARM_SSH_PORT || '1923' }}"
-          # Wait until the custom SSH port is open. This covers both cases:
-          # - Fresh droplet: kernel boot + sshd + apt upgrade + reboot + bootstrap
-          #   completing and opening the custom port (~5-10 min worst case)
-          # - Existing droplet: custom port is already open immediately
-          echo "Waiting for SSH on ${DROPLET_IP}:${SSH_PORT}..."
+          # Wait for either port 22 or the custom port to be reachable:
+          # - Fresh droplet: only port 22 is open (pre-bootstrap). Ansible
+          #   then runs bootstrap, which reboots and opens the custom port.
+          # - Existing droplet: port 22 is closed; custom port is open.
+          # Polling only the custom port would deadlock on fresh droplets
+          # because bootstrap (which opens it) hasn't run yet.
+          echo "Waiting for SSH on ${DROPLET_IP} (port 22 or ${SSH_PORT})..."
           for i in {1..60}; do
-            if nc -z -w 5 "${DROPLET_IP}" "${SSH_PORT}" 2>/dev/null; then
-              echo "SSH open on ${DROPLET_IP}:${SSH_PORT}"
+            if nc -z -w 5 "${DROPLET_IP}" 22 2>/dev/null || \
+               nc -z -w 5 "${DROPLET_IP}" "${SSH_PORT}" 2>/dev/null; then
+              echo "SSH ready on ${DROPLET_IP}"
               sleep 5
               exit 0
             fi
@@ -98,7 +101,7 @@ jobs:
           # double-quoted strings if the key comment contains special chars.
           {
             echo "deployer_ssh_public_key: |"
-            echo "  $(cat ~/.ssh/id_rsa.pub)"
+            sed 's/^/  /' ~/.ssh/id_rsa.pub
           } > /tmp/bootstrap_vars.yml
 
       - name: Run Ansible playbook (check mode)
