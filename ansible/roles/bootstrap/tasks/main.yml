@@ -1,14 +1,16 @@
 ---
-# Bootstrap role - initial droplet setup replacing cloud-init
+# Bootstrap role - initial droplet setup replacing cloud-init.
 # Runs once on fresh droplets as root before the deployer user exists.
-# All subsequent configuration is handled by the other roles via the deployer user.
+# Subsequent configuration is handled by other roles via the deployer user.
 
 - name: Ensure Python 3 is available
   ansible.builtin.raw: >
     test -x /usr/bin/python3 ||
-    (apt-get update -qq && apt-get install -y -qq python3 && echo "python3 installed")
-  register: python_check
-  changed_when: "'python3 installed' in python_check.stdout"
+    (apt-get update -qq &&
+    apt-get install -y -qq python3 &&
+    echo "python3 installed")
+  register: bootstrap_python_check
+  changed_when: "'python3 installed' in bootstrap_python_check.stdout"
 
 - name: Update apt cache and upgrade packages
   ansible.builtin.apt:

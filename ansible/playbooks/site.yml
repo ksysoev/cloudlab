@@ -3,10 +3,10 @@
 # This playbook configures the DigitalOcean droplet with all required services
 
 - name: Bootstrap fresh droplet
-  # Connects as root on port 22 — only available on a brand-new droplet.
-  # Creates the deployer user, SSH key, sudo access, and sets the custom SSH port.
-  # Skipped entirely if the host is unreachable on port 22 (existing droplet where
-  # root login and port 22 are already disabled) or if the deployer user already exists.
+  # Connects as root on port 22 — only on a brand-new droplet.
+  # Creates the deployer user, SSH key, sudo, and sets the SSH port.
+  # Skipped if host is unreachable on port 22 (existing droplet where
+  # root login and port 22 are disabled) or deployer user already exists.
   hosts: swarm
   become: true
   gather_facts: false
