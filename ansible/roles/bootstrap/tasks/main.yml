@@ -50,6 +50,7 @@
   ansible.builtin.copy:
     dest: /etc/ssh/sshd_config.d/bootstrap.conf
     content: |
+      Port 22
       Port {{ ssh_port }}
       PermitRootLogin no
       PasswordAuthentication no

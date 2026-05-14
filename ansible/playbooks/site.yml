@@ -5,10 +5,12 @@
 - name: Bootstrap fresh droplet
   # Connects as root on port 22 — only available on a brand-new droplet.
   # Creates the deployer user, SSH key, sudo access, and sets the custom SSH port.
-  # Skipped entirely if the deployer user already exists (idempotent).
+  # Skipped entirely if the host is unreachable on port 22 (existing droplet where
+  # root login and port 22 are already disabled) or if the deployer user already exists.
   hosts: swarm
   become: true
   gather_facts: false
+  ignore_unreachable: true
   vars:
     ansible_user: root
     ansible_port: 22
@@ -22,7 +24,9 @@
 
   roles:
     - role: bootstrap
-      when: deployer_check.rc != 0
+      when: >
+        deployer_check.rc is defined
+        and deployer_check.rc != 0
       tags: [bootstrap]
 
 - name: Configure CloudLab Swarm Infrastructure
