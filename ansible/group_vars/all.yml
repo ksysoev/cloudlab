@@ -3,6 +3,11 @@
 ansible_user: deployer
 ansible_ssh_port: 1923
 
+# Bootstrap
+# SSH public key for the deployer user — overridden at runtime by CI/CD
+# (derived from secrets.SSH_PRIVATE_KEY via ssh-keygen -y)
+deployer_ssh_public_key: ""
+
 # SSH hardening
 ssh_port: 1923
 

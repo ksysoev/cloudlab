@@ -1,0 +1,59 @@
+---
+# Bootstrap role - initial droplet setup replacing cloud-init
+# Runs once on fresh droplets as root before the deployer user exists.
+# All subsequent configuration is handled by the other roles via the deployer user.
+
+- name: Update apt cache and upgrade packages
+  ansible.builtin.apt:
+    update_cache: true
+    upgrade: dist
+  notify: Reboot server
+
+- name: Install bootstrap dependencies
+  ansible.builtin.apt:
+    name:
+      - python3
+      - python3-apt
+      - curl
+    state: present
+
+- name: Create deployer group
+  ansible.builtin.group:
+    name: deployer
+    state: present
+
+- name: Create deployer user
+  ansible.builtin.user:
+    name: deployer
+    groups:
+      - deployer
+      - users
+    shell: /bin/bash
+    state: present
+
+- name: Add deployer SSH authorized key
+  ansible.posix.authorized_key:
+    user: deployer
+    key: "{{ deployer_ssh_public_key }}"
+    state: present
+
+- name: Grant deployer passwordless sudo
+  ansible.builtin.copy:
+    dest: /etc/sudoers.d/deployer
+    content: "deployer ALL=(ALL) NOPASSWD:ALL\n"
+    mode: '0440'
+    owner: root
+    group: root
+    validate: visudo -cf %s
+
+- name: Configure SSH port and basic hardening (bootstrap)
+  ansible.builtin.copy:
+    dest: /etc/ssh/sshd_config.d/bootstrap.conf
+    content: |
+      Port {{ ssh_port }}
+      PermitRootLogin no
+      PasswordAuthentication no
+    mode: '0644'
+    owner: root
+    group: root
+  notify: Restart ssh

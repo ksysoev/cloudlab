@@ -1,7 +1,29 @@
 ---
 # CloudLab Server Configuration Playbook
 # This playbook configures the DigitalOcean droplet with all required services
-# It replaces the cloud-init configuration for idempotent, stateful deployments
+
+- name: Bootstrap fresh droplet
+  # Connects as root on port 22 — only available on a brand-new droplet.
+  # Creates the deployer user, SSH key, sudo access, and sets the custom SSH port.
+  # Skipped entirely if the deployer user already exists (idempotent).
+  hosts: swarm
+  become: true
+  gather_facts: false
+  vars:
+    ansible_user: root
+    ansible_port: 22
+
+  pre_tasks:
+    - name: Check if deployer user exists
+      ansible.builtin.raw: id deployer
+      register: deployer_check
+      failed_when: false
+      changed_when: false
+
+  roles:
+    - role: bootstrap
+      when: deployer_check.rc != 0
+      tags: [bootstrap]
 
 - name: Configure CloudLab Swarm Infrastructure
   hosts: swarm

@@ -57,16 +57,24 @@ jobs:
         run: terraform init
         working-directory: ./terraform
 
-      - name: Wait for droplet SSH after reboot
+      - name: Wait for droplet SSH
         working-directory: .
         run: |
           DROPLET_IP=$(cd terraform && terraform output -raw droplet_ip)
           SSH_PORT="${{ secrets.SWARM_SSH_PORT || '1923' }}"
-          echo "Waiting for SSH on ${DROPLET_IP}:${SSH_PORT}..."
+          # On a fresh droplet only port 22 (root) is available until bootstrap runs.
+          # On an existing droplet only the custom port is open (root login disabled).
+          # Accept either so both first-provision and re-run cases work.
+          echo "Waiting for SSH on ${DROPLET_IP} (port 22 or ${SSH_PORT})..."
           for i in {1..30}; do
             if nc -z -w 5 "${DROPLET_IP}" "${SSH_PORT}" 2>/dev/null; then
-              echo "SSH port is open on ${DROPLET_IP}:${SSH_PORT}"
-              sleep 5  # Wait a bit more for SSH service to be fully ready
+              echo "SSH open on ${DROPLET_IP}:${SSH_PORT}"
+              sleep 5
+              exit 0
+            fi
+            if nc -z -w 5 "${DROPLET_IP}" 22 2>/dev/null; then
+              echo "SSH open on ${DROPLET_IP}:22 (fresh droplet — bootstrap will configure custom port)"
+              sleep 5
               exit 0
             fi
             echo "SSH not ready yet, retrying in 10 seconds... (attempt ${i}/30)"
@@ -82,10 +90,13 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           DROPLET_IP=$(cd terraform && terraform output -raw droplet_ip)
+          # Scan both port 22 (fresh droplet) and the custom port (existing droplet)
+          ssh-keyscan -p 22 -H "${DROPLET_IP}" >> ~/.ssh/known_hosts 2>/dev/null || true
           ssh-keyscan -p ${{ secrets.SWARM_SSH_PORT || '1923' }} -H "${DROPLET_IP}" >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Test Ansible connection
-        run: ansible all -m ping
+      - name: Derive SSH public key from private key
+        run: ssh-keygen -y -f ~/.ssh/id_rsa > ~/.ssh/id_rsa.pub
+        working-directory: .
 
       - name: Run Ansible playbook (check mode)
         run: |
@@ -94,6 +105,7 @@ jobs:
             -e "ansible_user=${{ secrets.SWARM_USER || 'deployer' }}" \
             -e "ansible_ssh_port=${{ secrets.SWARM_SSH_PORT || '1923' }}" \
             -e "ssh_port=${{ secrets.SWARM_SSH_PORT || '1923' }}" \
+            -e "deployer_ssh_public_key=$(cat ~/.ssh/id_rsa.pub)" \
             -e "grafana_cloud_logs_url=${GRAFANA_CLOUD_LOGS_URL}" \
             -e "grafana_cloud_logs_id=${GRAFANA_CLOUD_LOGS_ID}" \
             -e "grafana_cloud_metrics_url=${GRAFANA_CLOUD_METRICS_URL}" \
@@ -114,6 +126,7 @@ jobs:
             -e "ansible_user=${{ secrets.SWARM_USER || 'deployer' }}" \
             -e "ansible_ssh_port=${{ secrets.SWARM_SSH_PORT || '1923' }}" \
             -e "ssh_port=${{ secrets.SWARM_SSH_PORT || '1923' }}" \
+            -e "deployer_ssh_public_key=$(cat ~/.ssh/id_rsa.pub)" \
             -e "grafana_cloud_logs_url=${GRAFANA_CLOUD_LOGS_URL}" \
             -e "grafana_cloud_logs_id=${GRAFANA_CLOUD_LOGS_ID}" \
             -e "grafana_cloud_metrics_url=${GRAFANA_CLOUD_METRICS_URL}" \
