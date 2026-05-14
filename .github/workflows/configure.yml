@@ -62,22 +62,18 @@ jobs:
         run: |
           DROPLET_IP=$(cd terraform && terraform output -raw droplet_ip)
           SSH_PORT="${{ secrets.SWARM_SSH_PORT || '1923' }}"
-          # On a fresh droplet only port 22 (root) is available until bootstrap runs.
-          # On an existing droplet only the custom port is open (root login disabled).
-          # Accept either so both first-provision and re-run cases work.
-          echo "Waiting for SSH on ${DROPLET_IP} (port 22 or ${SSH_PORT})..."
-          for i in {1..30}; do
+          # Wait until the custom SSH port is open. This covers both cases:
+          # - Fresh droplet: kernel boot + sshd + apt upgrade + reboot + bootstrap
+          #   completing and opening the custom port (~5-10 min worst case)
+          # - Existing droplet: custom port is already open immediately
+          echo "Waiting for SSH on ${DROPLET_IP}:${SSH_PORT}..."
+          for i in {1..60}; do
             if nc -z -w 5 "${DROPLET_IP}" "${SSH_PORT}" 2>/dev/null; then
               echo "SSH open on ${DROPLET_IP}:${SSH_PORT}"
               sleep 5
               exit 0
             fi
-            if nc -z -w 5 "${DROPLET_IP}" 22 2>/dev/null; then
-              echo "SSH open on ${DROPLET_IP}:22 (fresh droplet — bootstrap will configure custom port)"
-              sleep 5
-              exit 0
-            fi
-            echo "SSH not ready yet, retrying in 10 seconds... (attempt ${i}/30)"
+            echo "SSH not ready yet, retrying in 10 seconds... (attempt ${i}/60)"
             sleep 10
           done
           echo "SSH did not become available within the expected time."
@@ -101,6 +97,7 @@ jobs:
       - name: Run Ansible playbook (check mode)
         run: |
           ansible-playbook playbooks/site.yml --check --diff \
+            --skip-tags bootstrap \
             -e "@group_vars/all.yml" \
             -e "ansible_user=${{ secrets.SWARM_USER || 'deployer' }}" \
             -e "ansible_ssh_port=${{ secrets.SWARM_SSH_PORT || '1923' }}" \

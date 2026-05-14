@@ -3,6 +3,12 @@
 # Runs once on fresh droplets as root before the deployer user exists.
 # All subsequent configuration is handled by the other roles via the deployer user.
 
+- name: Ensure Python 3 is available
+  ansible.builtin.raw: >
+    test -x /usr/bin/python3 ||
+    (apt-get update -qq && apt-get install -y -qq python3)
+  changed_when: false
+
 - name: Update apt cache and upgrade packages
   ansible.builtin.apt:
     update_cache: true
@@ -46,14 +52,12 @@
     group: root
     validate: visudo -cf %s
 
-- name: Configure SSH port and basic hardening (bootstrap)
+- name: Configure SSH ports (bootstrap)
   ansible.builtin.copy:
     dest: /etc/ssh/sshd_config.d/bootstrap.conf
     content: |
       Port 22
       Port {{ ssh_port }}
-      PermitRootLogin no
-      PasswordAuthentication no
     mode: '0644'
     owner: root
     group: root
