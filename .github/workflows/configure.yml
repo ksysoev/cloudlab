@@ -99,8 +99,6 @@ jobs:
           ansible-playbook playbooks/site.yml --check --diff \
             --skip-tags bootstrap \
             -e "@group_vars/all.yml" \
-            -e "ansible_user=${{ secrets.SWARM_USER || 'deployer' }}" \
-            -e "ansible_ssh_port=${{ secrets.SWARM_SSH_PORT || '1923' }}" \
             -e "ssh_port=${{ secrets.SWARM_SSH_PORT || '1923' }}" \
             -e "deployer_ssh_public_key=$(cat ~/.ssh/id_rsa.pub)" \
             -e "grafana_cloud_logs_url=${GRAFANA_CLOUD_LOGS_URL}" \
@@ -120,8 +118,6 @@ jobs:
         run: |
           ansible-playbook playbooks/site.yml \
             -e "@group_vars/all.yml" \
-            -e "ansible_user=${{ secrets.SWARM_USER || 'deployer' }}" \
-            -e "ansible_ssh_port=${{ secrets.SWARM_SSH_PORT || '1923' }}" \
             -e "ssh_port=${{ secrets.SWARM_SSH_PORT || '1923' }}" \
             -e "deployer_ssh_public_key=$(cat ~/.ssh/id_rsa.pub)" \
             -e "grafana_cloud_logs_url=${GRAFANA_CLOUD_LOGS_URL}" \

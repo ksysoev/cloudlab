@@ -6,8 +6,9 @@
 - name: Ensure Python 3 is available
   ansible.builtin.raw: >
     test -x /usr/bin/python3 ||
-    (apt-get update -qq && apt-get install -y -qq python3)
-  changed_when: false
+    (apt-get update -qq && apt-get install -y -qq python3 && echo "python3 installed")
+  register: python_check
+  changed_when: "'python3 installed' in python_check.stdout"
 
 - name: Update apt cache and upgrade packages
   ansible.builtin.apt:
@@ -58,6 +59,8 @@
     content: |
       Port 22
       Port {{ ssh_port }}
+      PermitRootLogin no
+      PasswordAuthentication no
     mode: '0644'
     owner: root
     group: root
