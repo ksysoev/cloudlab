@@ -51,14 +51,14 @@
   gather_facts: true
 
   pre_tasks:
-    - name: Assert bootstrap completed for this host
-      ansible.builtin.assert:
-        that: hostvars[inventory_hostname].deployer_check is defined
-        fail_msg: >-
-          Bootstrap play did not run for {{ inventory_hostname }}
-          (deployer_check is undefined). The host may have been transiently
-          unreachable on port 22 during the bootstrap play. Verify SSH
-          connectivity on port 22 and re-run to bootstrap the host first.
+    - name: Warn if bootstrap probe was skipped for this host
+      ansible.builtin.debug:
+        msg: >-
+          Bootstrap probe did not run for {{ inventory_hostname }}
+          (deployer_check is undefined). This can happen for existing
+          hardened hosts where port 22/root login is disabled. Continuing
+          with the current play's SSH connection settings.
+      when: hostvars[inventory_hostname].deployer_check is not defined
       tags: [always]
 
   roles:
