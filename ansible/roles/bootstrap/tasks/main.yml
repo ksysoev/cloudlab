@@ -84,6 +84,10 @@
     reboot_timeout: 300
   become: true
   vars:
-    # Reconnect as deployer — root login is disabled by bootstrap.conf
-    # (PermitRootLogin no) which sshd loads on the way back up.
+    # Only the reconnect user changes here: the reboot is initiated over the
+    # current root@22 connection, and after boot Ansible reconnects as
+    # deployer on the inherited ansible_port (still 22 here), not ssh_port.
+    # That is why bootstrap.conf keeps port 22 open while disabling root
+    # login via PermitRootLogin no until the later security role switches
+    # SSH fully to the custom port.
     ansible_user: deployer
