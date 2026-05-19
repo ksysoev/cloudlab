@@ -1,0 +1,17 @@
+---
+# This role has no private defaults.
+#
+# It depends on the following playbook-wide variables defined in
+# group_vars/all.yml (or overridden via -e at invocation time):
+#
+#   deployer_ssh_public_key  (string) — SSH public key for the deployer user.
+#                            Must be non-empty. Injected via
+#                            -e @/tmp/bootstrap_vars.yml in CI.
+#
+#   ssh_port                 (integer) — Custom SSH port sshd will listen on
+#                            after bootstrap. Defaults to 1923 in group_vars.
+#
+# These variables are intentionally not redeclared here to avoid shadowing
+# the group_vars values and to comply with ansible-lint var-naming rules
+# (role defaults must use the bootstrap_ prefix, which would conflict with
+# the shared variable names used across all roles).

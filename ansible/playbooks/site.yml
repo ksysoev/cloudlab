@@ -1,12 +1,64 @@
 ---
 # CloudLab Server Configuration Playbook
 # This playbook configures the DigitalOcean droplet with all required services
-# It replaces the cloud-init configuration for idempotent, stateful deployments
+
+- name: Bootstrap fresh droplet
+  # Connects as root on port 22 — only on a brand-new droplet.
+  # Creates the deployer user, SSH key, sudo, and sets the SSH port.
+  #
+  # Skip conditions:
+  #   - Host unreachable on port 22: existing hardened droplet where root
+  #     login and port 22 have been disabled by the security role.
+  #   - Deployer user already exists: partially bootstrapped host.
+  #
+  # Port 22 window: bootstrap.conf keeps Port 22 open alongside the custom
+  # port until the security role removes it. During that window a re-run of
+  # this play will reach the host on port 22, but PermitRootLogin no causes
+  # the pre_task raw probe to fail as UNREACHABLE — which is handled by
+  # ignore_unreachable: true and the deployer_check.rc is defined gate.
+  # The window closes once the security role has run at least once.
+  hosts: swarm
+  become: true
+  gather_facts: false
+  ignore_unreachable: true
+  vars:
+    ansible_user: root
+    ansible_port: 22
+    # accept-new only auto-accepts keys not yet in known_hosts; it does not
+    # override changed keys. Required so the reboot reconnect does not hang
+    # when running outside CI (where ssh-keyscan pre-populates known_hosts).
+    ansible_ssh_common_args: '-o StrictHostKeyChecking=accept-new'
+
+  pre_tasks:
+    - name: Check if deployer user exists
+      ansible.builtin.raw: id deployer
+      register: deployer_check
+      become: false
+      failed_when: false
+      changed_when: false
+
+  roles:
+    - role: bootstrap
+      when: >
+        deployer_check.rc is defined
+        and deployer_check.rc != 0
+      tags: [bootstrap]
 
 - name: Configure CloudLab Swarm Infrastructure
   hosts: swarm
   become: true
   gather_facts: true
+
+  pre_tasks:
+    - name: Warn if bootstrap probe was skipped for this host
+      ansible.builtin.debug:
+        msg: >-
+          Bootstrap probe did not run for {{ inventory_hostname }}
+          (deployer_check is undefined). This can happen for existing
+          hardened hosts where port 22/root login is disabled. Continuing
+          with the current play's SSH connection settings.
+      when: hostvars[inventory_hostname].deployer_check is not defined
+      tags: [always]
 
   roles:
     - role: common

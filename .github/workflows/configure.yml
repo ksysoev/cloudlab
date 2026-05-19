@@ -57,19 +57,26 @@ jobs:
         run: terraform init
         working-directory: ./terraform
 
-      - name: Wait for droplet SSH after reboot
+      - name: Wait for droplet SSH
         working-directory: .
         run: |
           DROPLET_IP=$(cd terraform && terraform output -raw droplet_ip)
           SSH_PORT="${{ secrets.SWARM_SSH_PORT || '1923' }}"
-          echo "Waiting for SSH on ${DROPLET_IP}:${SSH_PORT}..."
-          for i in {1..30}; do
-            if nc -z -w 5 "${DROPLET_IP}" "${SSH_PORT}" 2>/dev/null; then
-              echo "SSH port is open on ${DROPLET_IP}:${SSH_PORT}"
-              sleep 5  # Wait a bit more for SSH service to be fully ready
+          # Wait for either port 22 or the custom port to be reachable:
+          # - Fresh droplet: only port 22 is open (pre-bootstrap). Ansible
+          #   then runs bootstrap, which reboots and opens the custom port.
+          # - Existing droplet: port 22 is closed; custom port is open.
+          # Polling only the custom port would deadlock on fresh droplets
+          # because bootstrap (which opens it) hasn't run yet.
+          echo "Waiting for SSH on ${DROPLET_IP} (port 22 or ${SSH_PORT})..."
+          for i in {1..60}; do
+            if nc -z -w 5 "${DROPLET_IP}" 22 2>/dev/null || \
+               nc -z -w 5 "${DROPLET_IP}" "${SSH_PORT}" 2>/dev/null; then
+              echo "SSH ready on ${DROPLET_IP}"
+              sleep 5
               exit 0
             fi
-            echo "SSH not ready yet, retrying in 10 seconds... (attempt ${i}/30)"
+            echo "SSH not ready yet, retrying in 10 seconds... (attempt ${i}/60)"
             sleep 10
           done
           echo "SSH did not become available within the expected time."
@@ -82,18 +89,28 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           DROPLET_IP=$(cd terraform && terraform output -raw droplet_ip)
+          # Scan both port 22 (fresh droplet) and the custom port (existing droplet)
+          ssh-keyscan -p 22 -H "${DROPLET_IP}" >> ~/.ssh/known_hosts 2>/dev/null || true
           ssh-keyscan -p ${{ secrets.SWARM_SSH_PORT || '1923' }} -H "${DROPLET_IP}" >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Test Ansible connection
-        run: ansible all -m ping
+      - name: Derive SSH public key from private key
+        working-directory: .
+        run: |
+          ssh-keygen -y -f ~/.ssh/id_rsa > ~/.ssh/id_rsa.pub
+          # Write as a YAML block scalar — avoids any quoting issues with
+          # double-quoted strings if the key comment contains special chars.
+          {
+            echo "deployer_ssh_public_key: |"
+            sed 's/^/  /' ~/.ssh/id_rsa.pub
+          } > /tmp/bootstrap_vars.yml
 
       - name: Run Ansible playbook (check mode)
         run: |
           ansible-playbook playbooks/site.yml --check --diff \
+            --skip-tags bootstrap \
             -e "@group_vars/all.yml" \
-            -e "ansible_user=${{ secrets.SWARM_USER || 'deployer' }}" \
-            -e "ansible_ssh_port=${{ secrets.SWARM_SSH_PORT || '1923' }}" \
             -e "ssh_port=${{ secrets.SWARM_SSH_PORT || '1923' }}" \
+            -e "@/tmp/bootstrap_vars.yml" \
             -e "grafana_cloud_logs_url=${GRAFANA_CLOUD_LOGS_URL}" \
             -e "grafana_cloud_logs_id=${GRAFANA_CLOUD_LOGS_ID}" \
             -e "grafana_cloud_metrics_url=${GRAFANA_CLOUD_METRICS_URL}" \
@@ -111,9 +128,8 @@ jobs:
         run: |
           ansible-playbook playbooks/site.yml \
             -e "@group_vars/all.yml" \
-            -e "ansible_user=${{ secrets.SWARM_USER || 'deployer' }}" \
-            -e "ansible_ssh_port=${{ secrets.SWARM_SSH_PORT || '1923' }}" \
             -e "ssh_port=${{ secrets.SWARM_SSH_PORT || '1923' }}" \
+            -e "@/tmp/bootstrap_vars.yml" \
             -e "grafana_cloud_logs_url=${GRAFANA_CLOUD_LOGS_URL}" \
             -e "grafana_cloud_logs_id=${GRAFANA_CLOUD_LOGS_ID}" \
             -e "grafana_cloud_metrics_url=${GRAFANA_CLOUD_METRICS_URL}" \

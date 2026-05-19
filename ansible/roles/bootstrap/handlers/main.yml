@@ -1,0 +1,4 @@
+---
+# No handlers — bootstrap uses an unconditional reboot task at the end of
+# tasks/main.yml so the custom SSH port is always activated regardless of
+# whether apt dist-upgrade found anything to upgrade.

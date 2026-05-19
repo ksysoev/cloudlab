@@ -37,7 +37,8 @@
 - name: Add Docker repository
   ansible.builtin.apt_repository:
     repo: >-
-      deb [arch={{ docker_debian_arch }} signed-by=/usr/share/keyrings/docker-archive-keyring.gpg]
+      deb [arch={{ docker_debian_arch }}
+      signed-by=/usr/share/keyrings/docker-archive-keyring.gpg]
       https://download.docker.com/linux/ubuntu
       {{ ansible_distribution_release }} stable
     state: present
@@ -90,7 +91,8 @@
 
 - name: Set public IP fact
   ansible.builtin.set_fact:
-    docker_droplet_public_ip: "{{ docker_public_ip_result.content | default('') | trim }}"
+    docker_droplet_public_ip: >-
+      {{ docker_public_ip_result.content | default('') | trim }}
   tags:
     - molecule-notest
   when: docker_public_ip_result.content is defined

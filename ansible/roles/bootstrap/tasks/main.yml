@@ -1,0 +1,93 @@
+---
+# Bootstrap role - initial droplet setup replacing cloud-init.
+# Runs once on fresh droplets as root before the deployer user exists.
+# Subsequent configuration is handled by other roles via the deployer user.
+
+- name: Ensure Python 3 and apt bindings are available
+  ansible.builtin.raw: |
+    apt-get update -qq
+    dpkg -s python3 python3-apt >/dev/null 2>&1 || apt-get install -y -qq python3 python3-apt
+  register: bootstrap_python_install
+  changed_when: "'Setting up' in bootstrap_python_install.stdout"
+
+- name: Assert required variables are provided
+  ansible.builtin.assert:
+    that:
+      - deployer_ssh_public_key | length > 0
+      - ssh_port | int > 0
+    fail_msg: >-
+      bootstrap role requires deployer_ssh_public_key (non-empty) and
+      ssh_port (positive integer). Set them via group_vars or
+      -e @/tmp/bootstrap_vars.yml.
+
+- name: Update apt cache and upgrade packages
+  ansible.builtin.apt:
+    update_cache: true
+    upgrade: dist
+
+- name: Install bootstrap dependencies
+  ansible.builtin.apt:
+    name:
+      - python3
+      - python3-apt
+      - curl
+    state: present
+
+- name: Create deployer group
+  ansible.builtin.group:
+    name: deployer
+    state: present
+
+- name: Create deployer user
+  ansible.builtin.user:
+    name: deployer
+    groups:
+      - deployer
+      - users
+    shell: /bin/bash
+    password_lock: true
+    state: present
+
+- name: Add deployer SSH authorized key
+  ansible.posix.authorized_key:
+    user: deployer
+    key: "{{ deployer_ssh_public_key }}"
+    state: present
+
+- name: Grant deployer passwordless sudo
+  ansible.builtin.copy:
+    dest: /etc/sudoers.d/deployer
+    content: "deployer ALL=(ALL) NOPASSWD:ALL\n"
+    mode: '0440'
+    owner: root
+    group: root
+    validate: visudo -cf %s
+
+- name: Configure SSH ports (bootstrap)
+  ansible.builtin.copy:
+    dest: /etc/ssh/sshd_config.d/bootstrap.conf
+    content: |
+      Port 22
+      Port {{ ssh_port }}
+      PermitRootLogin no
+      PasswordAuthentication no
+    mode: '0644'
+    owner: root
+    group: root
+
+# Port 22 is intentionally kept open alongside the custom port so Ansible
+# can reconnect after the reboot below. The security role removes
+# bootstrap.conf and writes custom_port.conf (custom port only), closing
+# port 22 once deployer access on the custom port is confirmed.
+- name: Reboot to apply updates and activate SSH configuration
+  ansible.builtin.reboot:
+    reboot_timeout: 300
+  become: true
+  vars:
+    # Only the reconnect user changes here: the reboot is initiated over the
+    # current root@22 connection, and after boot Ansible reconnects as
+    # deployer on the inherited ansible_port (still 22 here), not ssh_port.
+    # That is why bootstrap.conf keeps port 22 open while disabling root
+    # login via PermitRootLogin no until the later security role switches
+    # SSH fully to the custom port.
+    ansible_user: deployer
