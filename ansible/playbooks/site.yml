@@ -14,6 +14,10 @@
   vars:
     ansible_user: root
     ansible_port: 22
+    # accept-new only auto-accepts keys not yet in known_hosts; it does not
+    # override changed keys. Required so the reboot reconnect does not hang
+    # when running outside CI (where ssh-keyscan pre-populates known_hosts).
+    ansible_ssh_common_args: '-o StrictHostKeyChecking=accept-new'
 
   pre_tasks:
     - name: Check if deployer user exists

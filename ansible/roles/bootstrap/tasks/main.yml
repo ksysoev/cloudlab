@@ -42,6 +42,7 @@
       - deployer
       - users
     shell: /bin/bash
+    password_lock: true
     state: present
 
 - name: Add deployer SSH authorized key
