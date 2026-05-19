@@ -4,8 +4,11 @@
 # Subsequent configuration is handled by other roles via the deployer user.
 
 - name: Ensure Python 3 and apt bindings are available
-  ansible.builtin.raw: apt-get install -y -qq python3 python3-apt
-  changed_when: false
+  ansible.builtin.raw: |
+    apt-get update -qq
+    dpkg -s python3 python3-apt >/dev/null 2>&1 || apt-get install -y -qq python3 python3-apt
+  register: python_bootstrap
+  changed_when: "'Setting up' in python_bootstrap.stdout"
 
 - name: Assert required variables are provided
   ansible.builtin.assert:

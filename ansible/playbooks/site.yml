@@ -5,8 +5,18 @@
 - name: Bootstrap fresh droplet
   # Connects as root on port 22 — only on a brand-new droplet.
   # Creates the deployer user, SSH key, sudo, and sets the SSH port.
-  # Skipped if host is unreachable on port 22 (existing droplet where
-  # root login and port 22 are disabled) or deployer user already exists.
+  #
+  # Skip conditions:
+  #   - Host unreachable on port 22: existing hardened droplet where root
+  #     login and port 22 have been disabled by the security role.
+  #   - Deployer user already exists: partially bootstrapped host.
+  #
+  # Port 22 window: bootstrap.conf keeps Port 22 open alongside the custom
+  # port until the security role removes it. During that window a re-run of
+  # this play will reach the host on port 22, but PermitRootLogin no causes
+  # the pre_task raw probe to fail as UNREACHABLE — which is handled by
+  # ignore_unreachable: true and the deployer_check.rc is defined gate.
+  # The window closes once the security role has run at least once.
   hosts: swarm
   become: true
   gather_facts: false
@@ -26,6 +36,7 @@
       become: false
       failed_when: false
       changed_when: false
+      tags: [bootstrap]
 
   roles:
     - role: bootstrap
@@ -38,6 +49,17 @@
   hosts: swarm
   become: true
   gather_facts: true
+
+  pre_tasks:
+    - name: Assert bootstrap completed for this host
+      ansible.builtin.assert:
+        that: hostvars[inventory_hostname].deployer_check is defined
+        fail_msg: >-
+          Bootstrap play did not run for {{ inventory_hostname }}
+          (deployer_check is undefined). The host may have been transiently
+          unreachable on port 22 during the bootstrap play. Verify SSH
+          connectivity on port 22 and re-run to bootstrap the host first.
+      tags: [always]
 
   roles:
     - role: common
