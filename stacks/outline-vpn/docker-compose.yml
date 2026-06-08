@@ -23,6 +23,11 @@ services:
     environment:
       SB_API_PORT: "8443"
       SB_DEFAULT_SERVER_NAME: "cloudlab-outline"
+      # Shadowbox requires explicit cert paths — it does not generate certs
+      # itself. The bootstrap-tls job in deploy-outline.yml pre-generates a
+      # self-signed cert into the named volume before the stack is deployed.
+      SB_CERTIFICATE_FILE: /root/shadowbox/persisted-state/shadowbox-selfsigned.crt
+      SB_PRIVATE_KEY_FILE: /root/shadowbox/persisted-state/shadowbox-selfsigned.key
     deploy:
       replicas: 1
       # Pin to the manager node so the local named volume (outline-state) is

@@ -11,7 +11,73 @@ permissions:
   contents: read
 
 jobs:
+  # Ensure a self-signed TLS certificate exists in the named volume before the
+  # stack is deployed. Shadowbox requires SB_CERTIFICATE_FILE and
+  # SB_PRIVATE_KEY_FILE to point at readable files — it does not generate them.
+  # This job is idempotent: it skips generation when the cert is already present.
+  bootstrap-tls:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Prepare SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SWARM_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          SSH_PORT="${{ secrets.SWARM_SSH_PORT }}"
+          if [ -z "$SSH_PORT" ]; then SSH_PORT="1923"; fi
+          ssh-keyscan -p "$SSH_PORT" -H make-it-public.dev >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Generate TLS certificate if absent
+        run: |
+          SSH_PORT="${{ secrets.SWARM_SSH_PORT }}"
+          if [ -z "$SSH_PORT" ]; then SSH_PORT="1923"; fi
+          SSH_USER="${{ secrets.SWARM_USER }}"
+          if [ -z "$SSH_USER" ]; then SSH_USER="deployer"; fi
+
+          ssh -i ~/.ssh/deploy_key \
+              -p "$SSH_PORT" \
+              -o StrictHostKeyChecking=accept-new \
+              "${SSH_USER}@make-it-public.dev" << 'EOF'
+            set -euo pipefail
+
+            # Stack name matches the sanitised service_name passed to deploy-service.yml
+            # (outline-vpn → strip hyphens → outlinevpn).
+            VOLUME="outlinevpn_outline-state"
+            CERT_PATH="shadowbox-selfsigned.crt"
+            KEY_PATH="shadowbox-selfsigned.key"
+
+            # Create the volume if this is the very first deploy.
+            docker volume create "$VOLUME" > /dev/null 2>&1 || true
+
+            # Check whether the cert + key already exist inside the volume.
+            EXISTS=$(docker run --rm \
+              -v "${VOLUME}:/state" \
+              alpine sh -c "[ -s /state/${CERT_PATH} ] && [ -s /state/${KEY_PATH} ] && echo yes || echo no")
+            if [ "$EXISTS" = "yes" ]; then
+              echo "TLS certificate already present, skipping generation."
+              exit 0
+            fi
+
+            echo "Generating self-signed TLS certificate (valid 100 years)..."
+            docker run --rm \
+              -v "${VOLUME}:/state" \
+              alpine sh -c "
+                apk add --no-cache openssl > /dev/null 2>&1
+                openssl req -x509 -nodes -days 36500 -newkey rsa:4096 \
+                  -subj '/CN=make-it-public.dev' \
+                  -keyout /state/${KEY_PATH} \
+                  -out    /state/${CERT_PATH}
+              "
+            echo "Certificate generated at ${CERT_PATH}."
+          EOF
+
+      - name: Cleanup SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
   deploy:
+    needs: bootstrap-tls
     uses: ./.github/workflows/deploy-service.yml
     with:
       service_name: outline-vpn
