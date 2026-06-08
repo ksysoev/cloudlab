@@ -23,29 +23,22 @@ services:
     environment:
       SB_API_PORT: "8443"
       SB_DEFAULT_SERVER_NAME: "cloudlab-outline"
-    labels:
-      - "com.centurylinklabs.watchtower.enable=true"
     deploy:
       replicas: 1
-      restart_policy:
-        condition: any
-        delay: 5s
-        max_attempts: 3
-
-  watchtower:
-    image: containrrr/watchtower:latest
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    # Check for image updates every 24 hours; remove old images after update;
-    # only watch containers that have the opt-in label.
-    command: --interval 86400 --cleanup --label-enable
-    deploy:
-      replicas: 1
+      # Pin to the manager node so the local named volume (outline-state) is
+      # always accessible. If the service were rescheduled onto a different
+      # node the volume would not follow it, causing TLS cert / key loss.
       placement:
         constraints:
           - node.role == manager
       restart_policy:
         condition: any
+        delay: 5s
+        max_attempts: 3
+
+# Image updates are handled by the deploy-outline.yml GitHub Actions workflow,
+# which runs `docker stack deploy --resolve-image always` and always re-pulls
+# from the registry. A separate Watchtower service is therefore not needed.
 
 volumes:
   outline-state:

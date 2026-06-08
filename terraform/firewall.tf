@@ -47,10 +47,11 @@ resource "digitalocean_firewall" "swarm" {
   }
 
   # Outline VPN - Management API (Outline Manager desktop app)
+  # Restrict source IPs via var.outline_api_allowed_ips (default: open).
   inbound_rule {
     protocol         = "tcp"
     port_range       = "8443"
-    source_addresses = ["0.0.0.0/0", "::/0"]
+    source_addresses = var.outline_api_allowed_ips
   }
 
   # Outline VPN - Shadowsocks access keys (TCP)
