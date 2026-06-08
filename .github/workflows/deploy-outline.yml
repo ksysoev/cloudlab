@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "stacks/outline-vpn/**"
+      - ".github/workflows/deploy-outline.yml"
   workflow_dispatch:
 
 permissions:
