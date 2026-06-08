@@ -21,7 +21,7 @@ jobs:
       - name: Prepare SSH key
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SWARM_SSH_KEY }}" > ~/.ssh/deploy_key
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
 
           SSH_PORT="${{ secrets.SWARM_SSH_PORT }}"
@@ -35,15 +35,22 @@ jobs:
           SSH_USER="${{ secrets.SWARM_USER }}"
           if [ -z "$SSH_USER" ]; then SSH_USER="deployer"; fi
 
+          # Derive the Swarm stack name using the same sanitisation logic as
+          # deploy-service.yml (lowercase, strip non-alnum, strip hyphens).
+          # This must stay in sync with service_name: in the deploy job below.
+          SERVICE_RAW="outline-vpn"
+          STACK_NAME=$(echo "$SERVICE_RAW" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]-' | tr -d '-')
+
           ssh -i ~/.ssh/deploy_key \
               -p "$SSH_PORT" \
               -o StrictHostKeyChecking=accept-new \
-              "${SSH_USER}@make-it-public.dev" << 'EOF'
+              "${SSH_USER}@make-it-public.dev" \
+              STACK_NAME="$STACK_NAME" \
+              bash << 'EOF'
             set -euo pipefail
 
-            # Stack name matches the sanitised service_name passed to deploy-service.yml
-            # (outline-vpn → strip hyphens → outlinevpn).
-            VOLUME="outlinevpn_outline-state"
+            # Volume name = <stack>_<compose-volume-key>
+            VOLUME="${STACK_NAME}_outline-state"
             CERT_PATH="shadowbox-selfsigned.crt"
             KEY_PATH="shadowbox-selfsigned.key"
 
@@ -88,6 +95,6 @@ jobs:
       health_check_timeout: 90
       environment_name: production
     secrets:
-      ssh_key: ${{ secrets.SWARM_SSH_KEY }}
+      ssh_key: ${{ secrets.SSH_PRIVATE_KEY }}
       ssh_user: ${{ secrets.SWARM_USER }}
       ssh_port: ${{ secrets.SWARM_SSH_PORT }}
