@@ -50,11 +50,10 @@ jobs:
             # Create the volume if this is the very first deploy.
             docker volume create "$VOLUME" > /dev/null 2>&1 || true
 
-            # Check whether the cert already exists inside the volume.
+            # Check whether the cert + key already exist inside the volume.
             EXISTS=$(docker run --rm \
               -v "${VOLUME}:/state" \
-              alpine sh -c "[ -f /state/${CERT_PATH} ] && echo yes || echo no")
-
+              alpine sh -c "[ -s /state/${CERT_PATH} ] && [ -s /state/${KEY_PATH} ] && echo yes || echo no")
             if [ "$EXISTS" = "yes" ]; then
               echo "TLS certificate already present, skipping generation."
               exit 0
