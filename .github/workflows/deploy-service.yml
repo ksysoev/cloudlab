@@ -93,13 +93,13 @@ jobs:
           
           # Fall back to inputs if secrets not provided
           if [ -z "$SSH_HOST" ]; then
-            SSH_HOST="${{ steps.validate.outputs.ssh_host }}"
+            SSH_HOST="${{ inputs.ssh_host }}"
           fi
           if [ -z "$SSH_USER" ]; then
-            SSH_USER="${{ steps.validate.outputs.ssh_user }}"
+            SSH_USER="${{ inputs.ssh_user }}"
           fi
           if [ -z "$SSH_PORT" ]; then
-            SSH_PORT="${{ steps.validate.outputs.ssh_port }}"
+            SSH_PORT="${{ inputs.ssh_port }}"
           fi
           
           # Set defaults for optional parameters

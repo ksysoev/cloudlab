@@ -1,0 +1,45 @@
+services:
+  shadowbox:
+    image: quay.io/outline/shadowbox:stable
+    # Ports are published in host mode so traffic reaches the container
+    # directly without going through the Swarm ingress load-balancer.
+    # network_mode: host is intentionally NOT used — docker stack deploy
+    # silently ignores it, which would leave Shadowbox inaccessible.
+    ports:
+      - target: 8443
+        published: 8443
+        protocol: tcp
+        mode: host
+      - target: 8388
+        published: 8388
+        protocol: tcp
+        mode: host
+      - target: 8388
+        published: 8388
+        protocol: udp
+        mode: host
+    volumes:
+      - outline-state:/root/shadowbox/persisted-state
+    environment:
+      SB_API_PORT: "8443"
+      SB_DEFAULT_SERVER_NAME: "cloudlab-outline"
+    deploy:
+      replicas: 1
+      # Pin to the manager node so the local named volume (outline-state) is
+      # always accessible. If the service were rescheduled onto a different
+      # node the volume would not follow it, causing TLS cert / key loss.
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 3
+
+# Image updates are handled by the deploy-outline.yml GitHub Actions workflow,
+# which runs `docker stack deploy --resolve-image always` and always re-pulls
+# from the registry. A separate Watchtower service is therefore not needed.
+
+volumes:
+  outline-state:
+    driver: local

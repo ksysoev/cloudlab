@@ -98,3 +98,10 @@ variable "cloudflare_zone_name" {
   type        = string
   default     = "make-it-public.dev"
 }
+
+# Outline VPN
+variable "outline_api_allowed_ips" {
+  description = "Source IP ranges allowed to reach the Outline Manager API (port 8443). Defaults to unrestricted. Restrict to trusted admin IPs for a smaller attack surface."
+  type        = list(string)
+  default     = ["0.0.0.0/0", "::/0"]
+}
