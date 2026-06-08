@@ -1,0 +1,40 @@
+name: outline-vpn
+
+services:
+  shadowbox:
+    image: quay.io/outline/shadowbox:stable
+    # Host networking matches the official Outline install approach and allows
+    # Shadowbox to bind directly to host ports without NAT overhead.
+    network_mode: "host"
+    volumes:
+      - outline-state:/root/shadowbox/persisted-state
+    environment:
+      SB_API_PORT: "8443"
+      SB_DEFAULT_SERVER_NAME: "cloudlab-outline"
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 3
+
+  watchtower:
+    image: containrrr/watchtower:latest
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    # Check for image updates every 24 hours; remove old images after update;
+    # only watch containers that have the opt-in label.
+    command: --interval 86400 --cleanup --label-enable
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: any
+
+volumes:
+  outline-state:
+    driver: local

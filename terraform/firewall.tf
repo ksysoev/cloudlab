@@ -46,6 +46,27 @@ resource "digitalocean_firewall" "swarm" {
     source_addresses = ["0.0.0.0/0", "::/0"]
   }
 
+  # Outline VPN - Management API (Outline Manager desktop app)
+  inbound_rule {
+    protocol         = "tcp"
+    port_range       = "8443"
+    source_addresses = ["0.0.0.0/0", "::/0"]
+  }
+
+  # Outline VPN - Shadowsocks access keys (TCP)
+  inbound_rule {
+    protocol         = "tcp"
+    port_range       = "8388"
+    source_addresses = ["0.0.0.0/0", "::/0"]
+  }
+
+  # Outline VPN - Shadowsocks access keys (UDP)
+  inbound_rule {
+    protocol         = "udp"
+    port_range       = "8388"
+    source_addresses = ["0.0.0.0/0", "::/0"]
+  }
+
   # Allow all outbound traffic
   outbound_rule {
     protocol              = "tcp"

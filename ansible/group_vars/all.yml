@@ -33,8 +33,11 @@ firewall_allowed_tcp_ports:
   - "80"
   - "443"
   - "8081"  # MIT client connections
+  - "8388"  # Outline VPN - Shadowsocks access keys
+  - "8443"  # Outline VPN - Management API
 firewall_allowed_udp_ports:
   - "443"
+  - "8388"  # Outline VPN - Shadowsocks access keys
 
 # Firewall TCP port ranges (used for services requiring contiguous port blocks)
 firewall_allowed_tcp_port_ranges:
