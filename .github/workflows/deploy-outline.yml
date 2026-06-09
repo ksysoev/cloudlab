@@ -151,7 +151,7 @@ jobs:
 
             echo "Updating portForNewAccessKeys from $CURRENT to 8388..."
             docker exec "$CONTAINER" \
-              curl -sk -X PUT \
+              curl -fsSk -X PUT \
                 -H 'Content-Type: application/json' \
                 -d '{"port":8388}' \
                 "https://localhost:8443/$PREFIX/server/port-for-new-access-keys"
