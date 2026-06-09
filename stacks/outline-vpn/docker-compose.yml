@@ -28,6 +28,11 @@ services:
       # self-signed cert into the named volume before the stack is deployed.
       SB_CERTIFICATE_FILE: /root/shadowbox/persisted-state/shadowbox-selfsigned.crt
       SB_PRIVATE_KEY_FILE: /root/shadowbox/persisted-state/shadowbox-selfsigned.key
+      # Secret URL prefix for the management API. Without this anyone who can
+      # reach port 8443 could call the API. Set via OUTLINE_DEPLOYMENT_SECRETS
+      # GitHub Actions secret (production environment) and substituted by
+      # docker stack deploy at deploy time.
+      SB_API_PREFIX: "${SB_API_PREFIX}"
     deploy:
       replicas: 1
       # Pin to the manager node so the local named volume (outline-state) is

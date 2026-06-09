@@ -100,3 +100,4 @@ jobs:
       ssh_key: ${{ secrets.SWARM_SSH_KEY }}
       ssh_user: ${{ secrets.SWARM_USER }}
       ssh_port: ${{ secrets.SWARM_SSH_PORT }}
+      deployment_secrets: ${{ secrets.OUTLINE_DEPLOYMENT_SECRETS }}
