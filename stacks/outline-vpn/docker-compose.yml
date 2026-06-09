@@ -5,11 +5,11 @@ services:
     # directly without going through the Swarm ingress load-balancer.
     # network_mode: host is intentionally NOT used — docker stack deploy
     # silently ignores it, which would leave Shadowbox inaccessible.
+    #
+    # Port 8443 (management API) is intentionally NOT published. The API is
+    # accessed exclusively via `docker exec` from the server over SSH.
+    # See stacks/outline-vpn/README.md for key management instructions.
     ports:
-      - target: 8443
-        published: 8443
-        protocol: tcp
-        mode: host
       - target: 8388
         published: 8388
         protocol: tcp
