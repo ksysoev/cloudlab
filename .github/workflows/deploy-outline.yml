@@ -101,3 +101,63 @@ jobs:
       ssh_user: ${{ secrets.SWARM_USER }}
       ssh_port: ${{ secrets.SWARM_SSH_PORT }}
       deployment_secrets: ${{ secrets.OUTLINE_DEPLOYMENT_SECRETS }}
+
+  # Ensure the Shadowbox server generates access keys on port 8388, which is
+  # the port published in docker-compose.yml and open in the firewall.
+  # The server picks a random portForNewAccessKeys on first boot (persisted in
+  # the outline-state volume); this job corrects it to 8388 after every deploy.
+  # Idempotent: skips the API call when the port is already correct.
+  configure-server:
+    needs: deploy
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Prepare SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SWARM_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          SSH_PORT="${{ secrets.SWARM_SSH_PORT }}"
+          if [ -z "$SSH_PORT" ]; then SSH_PORT="1923"; fi
+          ssh-keyscan -p "$SSH_PORT" -H make-it-public.dev \
+            >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Set access-key port to 8388
+        run: |
+          SSH_PORT="${{ secrets.SWARM_SSH_PORT }}"
+          if [ -z "$SSH_PORT" ]; then SSH_PORT="1923"; fi
+          SSH_USER="${{ secrets.SWARM_USER }}"
+          if [ -z "$SSH_USER" ]; then SSH_USER="deployer"; fi
+
+          ssh -i ~/.ssh/deploy_key \
+              -p "$SSH_PORT" \
+              -o StrictHostKeyChecking=accept-new \
+              "${SSH_USER}@make-it-public.dev" bash << 'EOF'
+            set -euo pipefail
+            CONTAINER=$(docker ps -q --filter name=outlinevpn_shadowbox)
+            PREFIX=$(docker inspect "$CONTAINER" \
+              --format '{{range .Config.Env}}{{println .}}{{end}}' \
+              | grep SB_API_PREFIX | cut -d= -f2)
+
+            CURRENT=$(docker exec "$CONTAINER" \
+              curl -sk "https://localhost:8443/$PREFIX/server" \
+              | python3 -c "import sys,json; print(json.load(sys.stdin)['portForNewAccessKeys'])")
+
+            if [ "$CURRENT" = "8388" ]; then
+              echo "portForNewAccessKeys already 8388, nothing to do."
+              exit 0
+            fi
+
+            echo "Updating portForNewAccessKeys from $CURRENT to 8388..."
+            docker exec "$CONTAINER" \
+              curl -sk -X PUT \
+                -H 'Content-Type: application/json' \
+                -d '{"port":8388}' \
+                "https://localhost:8443/$PREFIX/server/access-key-default-port"
+            echo "Done."
+          EOF
+
+      - name: Cleanup SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
