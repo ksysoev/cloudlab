@@ -154,7 +154,7 @@ jobs:
               curl -sk -X PUT \
                 -H 'Content-Type: application/json' \
                 -d '{"port":8388}' \
-                "https://localhost:8443/$PREFIX/server/access-key-default-port"
+                "https://localhost:8443/$PREFIX/server/port-for-new-access-keys"
             echo "Done."
           EOF
 
