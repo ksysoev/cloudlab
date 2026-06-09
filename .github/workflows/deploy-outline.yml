@@ -18,6 +18,7 @@ jobs:
   # This job is idempotent: it skips generation when the cert is already present.
   bootstrap-tls:
     runs-on: ubuntu-latest
+    environment: production
     steps:
       - name: Prepare SSH key
         run: |
