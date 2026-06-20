@@ -81,7 +81,7 @@ jobs:
     
     steps:
       - name: Checkout caller repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Validate inputs
         id: validate
