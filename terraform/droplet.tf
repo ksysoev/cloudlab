@@ -12,7 +12,7 @@ locals {
   })
 
   cloud_init_rendered = templatefile("${path.module}/cloud-init.yml.tpl", {
-    deployer_ssh_public_key = var.ssh_public_key
+    deployer_ssh_public_key = var.deployer_ssh_public_key
     alloy_config            = local.alloy_config
     swarm_overlay_network   = var.swarm_overlay_network
   })
