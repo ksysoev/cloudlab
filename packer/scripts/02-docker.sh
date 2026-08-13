@@ -10,9 +10,14 @@ set -euo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
 
+APT_OPTS=(
+  -o DPkg::Lock::Timeout=300
+  -o Acquire::Retries=5
+)
+
 echo "==> [02-docker] Adding Docker GPG key..."
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
-  | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+  | gpg --dearmor --yes -o /usr/share/keyrings/docker-archive-keyring.gpg
 
 echo "==> [02-docker] Adding Docker apt repository..."
 cat > /etc/apt/sources.list.d/docker.list <<EOF
@@ -21,10 +26,10 @@ https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable
 EOF
 
 echo "==> [02-docker] Updating apt cache..."
-apt-get update -qq
+apt-get "${APT_OPTS[@]}" update -qq
 
 echo "==> [02-docker] Installing Docker CE and plugins..."
-apt-get install -y -qq \
+apt-get "${APT_OPTS[@]}" install -y -qq \
   docker-ce \
   docker-ce-cli \
   containerd.io \
