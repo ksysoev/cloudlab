@@ -6,12 +6,17 @@ set -euo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
 
+APT_OPTS=(
+  -o DPkg::Lock::Timeout=300
+  -o Acquire::Retries=5
+)
+
 echo "==> [01-base] Updating apt cache and upgrading packages..."
-apt-get update -qq
-apt-get upgrade -y -qq
+apt-get "${APT_OPTS[@]}" update -qq
+apt-get "${APT_OPTS[@]}" upgrade -y -qq
 
 echo "==> [01-base] Installing base packages..."
-apt-get install -y -qq \
+apt-get "${APT_OPTS[@]}" install -y -qq \
   apt-transport-https \
   ca-certificates \
   curl \

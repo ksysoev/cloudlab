@@ -10,21 +10,26 @@ set -euo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
 
+APT_OPTS=(
+  -o DPkg::Lock::Timeout=300
+  -o Acquire::Retries=5
+)
+
 echo "==> [04-monitoring] Adding Grafana apt repository..."
 mkdir -p /etc/apt/keyrings
 
 curl -fsSL https://apt.grafana.com/gpg.key \
-  | gpg --dearmor -o /etc/apt/keyrings/grafana.gpg
+  | gpg --dearmor --yes -o /etc/apt/keyrings/grafana.gpg
 
 cat > /etc/apt/sources.list.d/grafana.list <<'EOF'
 deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main
 EOF
 
 echo "==> [04-monitoring] Updating apt cache..."
-apt-get update -qq
+apt-get "${APT_OPTS[@]}" update -qq
 
 echo "==> [04-monitoring] Installing Grafana Alloy..."
-apt-get install -y -qq alloy
+apt-get "${APT_OPTS[@]}" install -y -qq alloy
 
 echo "==> [04-monitoring] Creating alloy system user..."
 # The package may already create the user; be idempotent

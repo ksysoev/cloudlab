@@ -11,8 +11,8 @@ echo "==> [99-cleanup] Removing SSH host keys (regenerated on first boot)..."
 rm -f /etc/ssh/ssh_host_*
 
 echo "==> [99-cleanup] Cleaning apt caches..."
-apt-get clean
-apt-get autoremove -y --purge
+apt-get -o DPkg::Lock::Timeout=300 clean
+apt-get -o DPkg::Lock::Timeout=300 autoremove -y --purge
 rm -rf /var/lib/apt/lists/*
 
 echo "==> [99-cleanup] Removing temporary files..."
