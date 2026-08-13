@@ -10,12 +10,11 @@ name: Provision Infrastructure
 #   2. provision.yml    — terraform apply deploys the new snapshot
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'terraform/**'
-      - '.github/workflows/provision.yml'
+  workflow_run:
+    workflows:
+      - Build Packer Image
+    types:
+      - completed
   workflow_dispatch:
     inputs:
       action:
@@ -39,6 +38,10 @@ jobs:
   terraform:
     name: Terraform ${{ github.event.inputs.action || 'apply' }}
     runs-on: ubuntu-latest
+    if: |
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main')
     environment: production
 
     defaults:
@@ -48,6 +51,14 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Show deployment commit
+        run: |
+          echo "Deploying commit: $(git rev-parse HEAD)"
+          echo "### Deployment Commit" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`$(git rev-parse HEAD)\`" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v4
@@ -78,7 +89,7 @@ jobs:
       - name: Terraform Apply
         id: apply
         if: |
-          (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+          (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
           github.event.inputs.action == 'apply'
         run: terraform apply -auto-approve -input=false
 
