@@ -24,7 +24,7 @@ source "digitalocean" "cloudlab" {
   ssh_username = "root"
 
   # Snapshot naming — timestamp makes every build uniquely addressable
-  snapshot_name    = "cloudlab-${formatdate("YYYY-MM-DD-hhmm", timestamp())}"
+  snapshot_name    = "cloudlab-${formatdate("YYYYMMDD-HHmmss", timestamp())}"
   snapshot_regions = var.snapshot_regions
 
   tags = ["packer", "cloudlab"]
@@ -73,18 +73,6 @@ build {
     destination = "/etc/docker/daemon.json"
   }
 
-  # fail2ban jail — SSH port baked at build time; matches 03-security.sh
-  provisioner "file" {
-    source      = "${path.root}/files/jail.local"
-    destination = "/etc/fail2ban/jail.local"
-  }
-
-  # SSH hardening drop-in (disables root login, password auth, sets port)
-  provisioner "file" {
-    source      = "${path.root}/files/sshd_custom.conf"
-    destination = "/etc/ssh/sshd_config.d/custom_port.conf"
-  }
-
   # ── Post-file fixups ───────────────────────────────────────────────────────
 
   # Ensure correct ownership/permissions on uploaded files
@@ -92,6 +80,7 @@ build {
     inline = [
       "chown root:root /etc/docker/daemon.json /etc/fail2ban/jail.local /etc/ssh/sshd_config.d/custom_port.conf",
       "chmod 0644 /etc/docker/daemon.json /etc/fail2ban/jail.local /etc/ssh/sshd_config.d/custom_port.conf",
+      "sshd -t",
     ]
   }
 

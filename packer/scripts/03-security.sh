@@ -43,7 +43,6 @@ echo "==> [03-security] UFW status:"
 ufw status verbose
 
 echo "==> [03-security] Enabling fail2ban..."
-# jail.local is uploaded by the Packer file provisioner after this script runs
 systemctl enable fail2ban
 
 echo "==> [03-security] Hardening SSH..."
@@ -51,8 +50,22 @@ echo "==> [03-security] Hardening SSH..."
 # port 22 and may conflict with our custom_port.conf drop-in.
 rm -f /etc/ssh/sshd_config.d/50-cloud-init.conf
 
-# sshd_custom.conf is uploaded by the Packer file provisioner (custom_port.conf).
-# It sets: Port <SSH_PORT>, PermitRootLogin no, PasswordAuthentication no.
+# Write SSH hardening and fail2ban config with the configured SSH port.
+cat > /etc/ssh/sshd_config.d/custom_port.conf <<EOF
+Port ${SSH_PORT}
+PermitRootLogin no
+PasswordAuthentication no
+EOF
+
+cat > /etc/fail2ban/jail.local <<EOF
+[sshd]
+enabled  = true
+port     = ${SSH_PORT}
+filter   = sshd
+logpath  = /var/log/auth.log
+maxretry = 5
+bantime  = 3600
+EOF
 
 # Validate the final sshd config before the snapshot is taken
 sshd -t && echo "==> [03-security] sshd config validation passed."

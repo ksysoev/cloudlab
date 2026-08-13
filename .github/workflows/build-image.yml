@@ -151,10 +151,10 @@ jobs:
         id: find-var
         run: |
           # Fetch all workspace variables and find the cloudlab_image_id var ID
-          RESPONSE=$(curl -sS \
+          RESPONSE=$(curl -sS --fail \
             -H "Authorization: Bearer ${{ secrets.TF_API_TOKEN }}" \
             -H "Content-Type: application/vnd.api+json" \
-            "https://app.terraform.io/api/v2/workspaces/${{ secrets.TF_WORKSPACE_ID }}/vars")
+            "https://app.terraform.io/api/v2/workspaces/${{ secrets.TF_WORKSPACE_ID }}/vars?page[size]=100")
 
           VAR_ID=$(echo "$RESPONSE" | jq -r '
             .data[]
@@ -208,7 +208,7 @@ jobs:
           NEW_SNAPSHOT_ID: ${{ needs.build.outputs.snapshot_id }}
         run: |
           echo "Fetching all cloudlab snapshots..."
-          SNAPSHOTS=$(curl -sS \
+          SNAPSHOTS=$(curl -sS --fail \
             -H "Authorization: Bearer ${DO_TOKEN}" \
             "https://api.digitalocean.com/v2/snapshots?resource_type=droplet&per_page=100" \
             | jq -r '

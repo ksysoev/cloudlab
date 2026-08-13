@@ -48,16 +48,19 @@ runcmd:
       echo "ERROR: Could not determine public IP from metadata endpoint."
       exit 1
     fi
-    echo "Initialising Docker Swarm with advertise-addr $PUBLIC_IP"
-    docker swarm init --advertise-addr "$PUBLIC_IP" || \
+    if [ "$(docker info --format '{{.Swarm.LocalNodeState}}' 2>/dev/null || echo inactive)" = "active" ]; then
       echo "Swarm already initialised, skipping."
+    else
+      echo "Initialising Docker Swarm with advertise-addr $PUBLIC_IP"
+      docker swarm init --advertise-addr "$PUBLIC_IP"
+    fi
 
   # Create the shared overlay network used by all application stacks
   - |
     docker network create \
       --driver overlay \
       --attachable \
-      cloudlab-public \
+      ${swarm_overlay_network} \
     || echo "Overlay network already exists, skipping."
 
   # Write Alloy config and start the service now that credentials are present

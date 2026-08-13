@@ -86,7 +86,7 @@ jobs:
         if: steps.apply.outcome == 'success'
         run: |
           DROPLET_IP=$(terraform output -raw droplet_ip)
-          SSH_PORT=1923
+          SSH_PORT=$(terraform output -json ssh_port | jq -r '.value')
           echo "Waiting for SSH on ${DROPLET_IP}:${SSH_PORT} (cloud-init may still be running)..."
           for i in $(seq 1 30); do
             if nc -z -w 5 "${DROPLET_IP}" "${SSH_PORT}" 2>/dev/null; then

@@ -1,7 +1,0 @@
-[sshd]
-enabled  = true
-port     = 1923
-filter   = sshd
-logpath  = /var/log/auth.log
-maxretry = 5
-bantime  = 3600

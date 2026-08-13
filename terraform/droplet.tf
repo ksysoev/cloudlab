@@ -14,6 +14,7 @@ locals {
   cloud_init_rendered = templatefile("${path.module}/cloud-init.yml.tpl", {
     deployer_ssh_public_key = var.ssh_public_key
     alloy_config            = local.alloy_config
+    swarm_overlay_network   = var.swarm_overlay_network
   })
 }
 
@@ -46,7 +47,7 @@ resource "digitalocean_droplet" "swarm_manager" {
   ipv6 = true
 
   # cloud-init payload — injects SSH key, initialises Swarm, writes Alloy config
-  user_data = local.cloud_init_rendered
+  user_data = sensitive(local.cloud_init_rendered)
 
   lifecycle {
     # New droplet is created and DNS updated before the old one is destroyed,
