@@ -17,7 +17,7 @@ on:
         description: 'DigitalOcean region for the build droplet'
         required: false
         type: string
-        default: 'fra1'
+        default: 'sgp1'
       dry_run:
         description: 'Validate only — do not build or push a snapshot'
         required: false
@@ -97,7 +97,7 @@ jobs:
           PACKER_LOG: 1
           PACKER_LOG_PATH: /tmp/packer.log
         run: |
-          DO_REGION="${{ inputs.do_region || 'fra1' }}"
+          DO_REGION="${{ inputs.do_region || 'sgp1' }}"
 
           packer build \
             -var "do_token=${{ secrets.DO_TOKEN }}" \

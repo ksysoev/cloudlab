@@ -14,7 +14,7 @@ cloudlab_image_id = "123456789"
 
 # Region where the droplet will be created
 # Available regions: nyc1, nyc3, sfo3, ams3, sgp1, lon1, fra1, tor1, blr1, syd1
-do_region = "fra1"
+do_region = "sgp1"
 
 # SSH port (non-standard for security)
 # Default: 1923 (instead of standard port 22)
@@ -22,10 +22,10 @@ ssh_port = 1923
 
 # Droplet size
 # s-1vcpu-1gb     = $6/mo  - 1GB RAM, 1 vCPU, 25GB SSD
-# s-1vcpu-2gb     = $12/mo - 2GB RAM, 1 vCPU, 50GB SSD (recommended)
+# s-1vcpu-2gb     = $12/mo - 2GB RAM, 1 vCPU, 50GB SSD
 # s-2vcpu-2gb     = $18/mo - 2GB RAM, 2 vCPU, 60GB SSD
 # s-2vcpu-4gb     = $24/mo - 4GB RAM, 2 vCPU, 80GB SSD
-droplet_size = "s-1vcpu-2gb"
+droplet_size = "s-1vcpu-1gb"
 
 # Droplet name
 droplet_name = "cloudlab-swarm"
@@ -50,6 +50,9 @@ grafana_cloud_logs_id     = "" # Loki instance ID
 grafana_cloud_metrics_url = "" # Prometheus push URL
 grafana_cloud_metrics_id  = "" # Prometheus instance ID
 grafana_cloud_api_key     = "" # Shared API key
+
+# Weekly backups (adds ~20% to droplet cost)
+backups_enabled = false
 
 # Tags for organizing resources
 tags = ["cloudlab", "swarm", "terraform", "production"]
