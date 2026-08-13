@@ -30,11 +30,16 @@ droplet_size = "s-1vcpu-1gb"
 # Droplet name
 droplet_name = "cloudlab-swarm"
 
-# SSH public key content for accessing the droplet
-# Generate with: ssh-keygen -t ed25519 -C "your_email@example.com"
-# Provide the full public key string, not a file path.
-# Can also be set via environment variable: TF_VAR_ssh_public_key
-ssh_public_key = "ssh-ed25519 AAAA... user@host"
+# SSH public key registered with DigitalOcean (emergency/root access only)
+# This key is attached to the droplet at the DO level for recovery via console.
+# Generate with: ssh-keygen -t ed25519 -C "cloudlab-root"
+ssh_public_key = "ssh-ed25519 AAAA... root-key@host"
+
+# SSH public key injected into /home/deployer/.ssh/authorized_keys by cloud-init.
+# THIS is the key used for all normal SSH access and CI/CD deployments.
+# Must match the private key stored in the SWARM_SSH_KEY / SSH_PRIVATE_KEY GitHub secret.
+# Derive the public key from your CI private key with: ssh-keygen -y -f private_key
+deployer_ssh_public_key = "ssh-ed25519 AAAA... deployer-key@host"
 
 # Note: IP whitelisting is not used as no static IP is available
 # The firewall allows connections from any IP to the following ports:

@@ -42,7 +42,12 @@ variable "droplet_name" {
 }
 
 variable "ssh_public_key" {
-  description = "SSH public key content for droplet access"
+  description = "SSH public key registered with DigitalOcean (for emergency root access via DO console/recovery). Not used for normal deployer SSH login."
+  type        = string
+}
+
+variable "deployer_ssh_public_key" {
+  description = "SSH public key injected into /home/deployer/.ssh/authorized_keys by cloud-init. Must match the private key in the SWARM_SSH_KEY / SSH_PRIVATE_KEY GitHub secret used by CI/CD workflows."
   type        = string
 }
 
