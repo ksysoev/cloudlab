@@ -6,6 +6,6 @@
 #   packer build -var-file=cloudlab.pkrvars.hcl .
 
 do_token        = "dop_v1_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-do_region       = "fra1"
+do_region       = "sgp1"
 do_builder_size = "s-1vcpu-1gb"
 ssh_port        = 1923

@@ -7,7 +7,7 @@ variable "do_token" {
 variable "do_region" {
   description = "DigitalOcean region for the build droplet"
   type        = string
-  default     = "fra1"
+  default     = "sgp1"
 }
 
 variable "do_builder_size" {

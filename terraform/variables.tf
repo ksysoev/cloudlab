@@ -20,7 +20,7 @@ variable "do_token" {
 variable "do_region" {
   description = "DigitalOcean region for the droplet"
   type        = string
-  default     = "fra1"
+  default     = "sgp1"
 }
 
 variable "ssh_port" {
@@ -32,7 +32,7 @@ variable "ssh_port" {
 variable "droplet_size" {
   description = "Size of the droplet"
   type        = string
-  default     = "s-1vcpu-2gb" # Regular - $12/mo, 2GB RAM, 1 vCPU
+  default     = "s-1vcpu-1gb" # Regular - $6/mo, 1GB RAM, 1 vCPU
 }
 
 variable "droplet_name" {
@@ -101,7 +101,7 @@ variable "swarm_overlay_network" {
 variable "backups_enabled" {
   description = "Enable weekly backups for the droplet (adds 20% to droplet cost)"
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "tags" {
