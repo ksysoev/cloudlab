@@ -22,7 +22,7 @@ ssh_port = 1923
 
 # Droplet size
 # s-1vcpu-1gb     = $6/mo  - 1GB RAM, 1 vCPU, 25GB SSD
-# s-1vcpu-2gb     = $12/mo - 2GB RAM, 1 vCPU, 50GB SSD (recommended)
+# s-1vcpu-2gb     = $12/mo - 2GB RAM, 1 vCPU, 50GB SSD
 # s-2vcpu-2gb     = $18/mo - 2GB RAM, 2 vCPU, 60GB SSD
 # s-2vcpu-4gb     = $24/mo - 4GB RAM, 2 vCPU, 80GB SSD
 droplet_size = "s-1vcpu-1gb"
