@@ -1,15 +1,20 @@
 name: Provision Infrastructure
 
-# This workflow provisions infrastructure using Terraform
-# After successful completion, the Configure Server workflow runs Ansible
-# to configure the OS and services
+# Provisions or updates DigitalOcean infrastructure via Terraform.
+# The droplet is deployed from a pre-baked Packer snapshot (cloudlab_image_id).
+# All server configuration is handled by cloud-init at first boot — no
+# separate Ansible configure step is required.
+#
+# Trigger order for a full image update:
+#   1. build-image.yml  — builds new Packer snapshot, updates cloudlab_image_id
+#   2. provision.yml    — terraform apply deploys the new snapshot
 
 on:
   push:
     branches:
       - main
+    paths:
       - 'terraform/**'
-      - 'ansible/**'
       - '.github/workflows/provision.yml'
   workflow_dispatch:
     inputs:
@@ -34,22 +39,22 @@ jobs:
   terraform:
     name: Terraform ${{ github.event.inputs.action || 'apply' }}
     runs-on: ubuntu-latest
-    
-    # Always use production environment for main branch operations
     environment: production
-    
+
     defaults:
       run:
         working-directory: ${{ env.TF_WORKING_DIR }}
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: ${{ env.TF_VERSION }}
+          # HCP Terraform token — all variable values are managed in the
+          # workspace so no TF_VAR_* env vars are needed here.
           cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
 
       - name: Terraform Format Check
@@ -65,10 +70,6 @@ jobs:
         id: validate
         run: terraform validate -no-color
 
-      # Note: All TF_VAR_* variables are configured directly in the HCP Terraform
-      # workspace as Terraform variables. Environment variables set here do NOT
-      # reach the remote execution runner.
-
       - name: Terraform Plan
         id: plan
         if: github.event.inputs.action == 'plan'
@@ -76,16 +77,47 @@ jobs:
 
       - name: Terraform Apply
         id: apply
-        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event.inputs.action == 'apply'
+        if: |
+          (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+          github.event.inputs.action == 'apply'
         run: terraform apply -auto-approve -input=false
+
+      - name: Verify droplet is reachable via SSH
+        if: steps.apply.outcome == 'success'
+        run: |
+          TF_OUTPUTS=$(terraform output -json)
+          DROPLET_IP=$(echo "$TF_OUTPUTS" | jq -r '.droplet_ip.value')
+          SSH_PORT=$(echo "$TF_OUTPUTS" | jq -r '.ssh_port.value')
+          echo "Waiting for SSH on ${DROPLET_IP}:${SSH_PORT} (cloud-init may still be running)..."
+          for i in $(seq 1 30); do
+            if nc -z -w 5 "${DROPLET_IP}" "${SSH_PORT}" 2>/dev/null; then
+              echo "SSH is reachable on ${DROPLET_IP}:${SSH_PORT}"
+              exit 0
+            fi
+            echo "Attempt ${i}/30 — not ready yet, retrying in 15s..."
+            sleep 15
+          done
+          echo "WARNING: SSH did not become reachable within 7.5 minutes."
+          echo "cloud-init may still be running — check droplet console."
+          exit 1
 
       - name: Terraform Destroy
         if: github.event.inputs.action == 'destroy' && github.ref == 'refs/heads/main'
         run: terraform destroy -auto-approve -input=false
 
-      - name: Terraform Format Status
+      - name: Format failure notice
         if: steps.fmt.outcome == 'failure'
         run: |
-          echo "Terraform formatting check failed. Run 'terraform fmt -recursive' to fix."
+          echo "Terraform formatting check failed."
+          echo "Run 'terraform fmt -recursive ./terraform' to fix."
           exit 1
 
+      - name: Deployment summary
+        if: steps.apply.outcome == 'success'
+        run: |
+          TF_OUTPUTS=$(terraform output -json)
+          DROPLET_NAME=$(echo "$TF_OUTPUTS" | jq -r '.droplet_name.value')
+          echo "### Infrastructure Provisioned :white_check_mark:" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Droplet deployed from Packer snapshot \`${DROPLET_NAME}\`." >> "$GITHUB_STEP_SUMMARY"
+          echo "cloud-init is configuring Docker Swarm and Grafana Alloy at first boot." >> "$GITHUB_STEP_SUMMARY"

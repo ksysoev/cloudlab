@@ -177,7 +177,7 @@ cloudlab/
 │   ├── cloud-init.yaml     # Minimal bootstrap (Python + SSH)
 │   └── terraform.tfvars.example
 │
-├── ansible/                # Configuration management (Ansible)
+├── ansible/                # Legacy Ansible artifacts (no longer on deploy path)
 │   ├── ansible.cfg         # Ansible configuration
 │   ├── inventory/
 │   │   └── production.py   # Dynamic inventory from Terraform
@@ -193,8 +193,8 @@ cloudlab/
 │   └── README.md           # Ansible documentation
 │
 ├── .github/workflows/      # CI/CD automation
+│   ├── build-image.yml     # Packer image build + snapshot lifecycle
 │   ├── provision.yml       # Terraform (infrastructure)
-│   ├── configure.yml       # Ansible (configuration)
 │   ├── deploy-service.yml  # Reusable deployment workflow
 │   └── test.yml            # Terraform validation
 │
@@ -218,13 +218,13 @@ cloudlab/
 
 - **Cloud Provider:** DigitalOcean
 - **Infrastructure as Code:** Terraform with Terraform Cloud backend
-- **Configuration Management:** Ansible
+- **Image Build:** Packer
 - **OS:** Ubuntu 24.04 LTS
 - **Container Orchestration:** Docker Swarm
 - **CI/CD:** GitHub Actions
 - **Container Registry:** GitHub Container Registry (GHCR)
 - **Monitoring:** Grafana Alloy → Grafana Cloud
-- **Automation:** Cloud-init (bootstrap only), Ansible (full config)
+- **Automation:** Cloud-init (first-boot runtime config)
 
 ## Cost Breakdown
 

@@ -10,6 +10,7 @@ terraform {
       source  = "cloudflare/cloudflare"
       version = "~> 4.0"
     }
+
   }
 
   # Terraform Cloud backend configuration

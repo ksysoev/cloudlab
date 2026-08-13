@@ -7,13 +7,6 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 5
 
-  # Python dependencies (Ansible)
-  - package-ecosystem: "pip"
-    directory: "/ansible"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 5
-
   # GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -24,6 +17,13 @@ updates:
   # Terraform
   - package-ecosystem: "terraform"
     directory: "/terraform"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+
+  # Packer
+  - package-ecosystem: "terraform"
+    directory: "/packer"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
