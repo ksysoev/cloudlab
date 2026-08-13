@@ -80,6 +80,8 @@ build {
     inline = [
       "chown root:root /etc/docker/daemon.json /etc/fail2ban/jail.local /etc/ssh/sshd_config.d/custom_port.conf",
       "chmod 0644 /etc/docker/daemon.json /etc/fail2ban/jail.local /etc/ssh/sshd_config.d/custom_port.conf",
+      "mkdir -p /run/sshd",
+      "chmod 0755 /run/sshd",
       "sshd -t",
     ]
   }
