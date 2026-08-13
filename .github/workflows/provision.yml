@@ -85,7 +85,7 @@ jobs:
       - name: Verify droplet is reachable via SSH
         if: steps.apply.outcome == 'success'
         run: |
-          DROPLET_IP=$(terraform output -raw droplet_ip)
+          DROPLET_IP=$(terraform output -json droplet_ip | jq -r '.value')
           SSH_PORT=$(terraform output -json ssh_port | jq -r '.value')
           echo "Waiting for SSH on ${DROPLET_IP}:${SSH_PORT} (cloud-init may still be running)..."
           for i in $(seq 1 30); do
@@ -116,5 +116,5 @@ jobs:
         run: |
           echo "### Infrastructure Provisioned :white_check_mark:" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "Droplet deployed from Packer snapshot \`$(terraform output -raw droplet_name)\`." >> "$GITHUB_STEP_SUMMARY"
+          echo "Droplet deployed from Packer snapshot \`$(terraform output -json droplet_name | jq -r '.value')\`." >> "$GITHUB_STEP_SUMMARY"
           echo "cloud-init is configuring Docker Swarm and Grafana Alloy at first boot." >> "$GITHUB_STEP_SUMMARY"

@@ -20,8 +20,8 @@ write_files:
   # Grafana Alloy config with real credentials — overwrites the placeholder
   # written by the 04-monitoring.sh Packer script.
   - path: /etc/alloy/config.alloy
-    owner: root:root
-    permissions: "0600"
+    owner: root:alloy
+    permissions: "0640"
     content: |
       ${indent(6, alloy_config)}
 
