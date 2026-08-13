@@ -67,7 +67,10 @@ maxretry = 5
 bantime  = 3600
 EOF
 
-# Validate the final sshd config before the snapshot is taken
+# Validate the final sshd config before the snapshot is taken.
+# In non-booted image build environments, /run/sshd may be absent.
+mkdir -p /run/sshd
+chmod 0755 /run/sshd
 sshd -t && echo "==> [03-security] sshd config validation passed."
 
 echo "==> [03-security] Done."
