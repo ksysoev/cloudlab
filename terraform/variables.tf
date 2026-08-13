@@ -91,6 +91,11 @@ variable "swarm_overlay_network" {
   description = "Name of the Docker overlay network created at first boot by cloud-init"
   type        = string
   default     = "cloudlab-public"
+
+  validation {
+    condition     = can(regex("^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,62}$", var.swarm_overlay_network))
+    error_message = "swarm_overlay_network must start with an alphanumeric character and contain only letters, digits, dot (.), underscore (_), or hyphen (-), up to 63 characters."
+  }
 }
 
 variable "backups_enabled" {

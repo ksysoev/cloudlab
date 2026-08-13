@@ -21,7 +21,7 @@ write_files:
   # written by the 04-monitoring.sh Packer script.
   - path: /etc/alloy/config.alloy
     owner: root:root
-    permissions: "0644"
+    permissions: "0600"
     content: |
       ${indent(6, alloy_config)}
 
@@ -60,7 +60,7 @@ runcmd:
     docker network create \
       --driver overlay \
       --attachable \
-      ${swarm_overlay_network} \
+      "${swarm_overlay_network}" \
     || echo "Overlay network already exists, skipping."
 
   # Write Alloy config and start the service now that credentials are present
