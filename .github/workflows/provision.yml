@@ -83,8 +83,7 @@ jobs:
     if: |
       (github.event_name != 'workflow_run' ||
         (github.event.workflow_run.conclusion == 'success' &&
-         github.event.workflow_run.head_branch == 'main' &&
-         github.event.workflow_run.event == 'push')) &&
+         github.event.workflow_run.head_branch == 'main')) &&
       (github.event_name != 'push' || needs.changes.outputs.packer_changed != 'true')
     environment: production
 
@@ -95,6 +94,14 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Show deployment commit
+        run: |
+          echo "Deploying commit: $(git rev-parse HEAD)"
+          echo "### Deployment Commit" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`$(git rev-parse HEAD)\`" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v4
