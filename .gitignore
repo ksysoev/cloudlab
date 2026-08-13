@@ -59,6 +59,11 @@ terraform/test_fixtures/test_key
 *.tfplan
 *.tfplan.*
 
+# Packer
+packer_cache/
+*.pkrvars.hcl
+!*.pkrvars.hcl.example
+
 # Backup files
 *.backup
 *.bak

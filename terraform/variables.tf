@@ -1,3 +1,16 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Packer image
+# ─────────────────────────────────────────────────────────────────────────────
+
+variable "cloudlab_image_id" {
+  description = "DigitalOcean snapshot ID (or slug) produced by the Packer build workflow. Changing this value triggers a droplet replacement."
+  type        = string
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DigitalOcean credentials & placement
+# ─────────────────────────────────────────────────────────────────────────────
+
 variable "do_token" {
   description = "DigitalOcean API token"
   type        = string
@@ -72,6 +85,12 @@ variable "grafana_cloud_api_key" {
   type        = string
   default     = ""
   sensitive   = true
+}
+
+variable "swarm_overlay_network" {
+  description = "Name of the Docker overlay network created at first boot by cloud-init"
+  type        = string
+  default     = "cloudlab-public"
 }
 
 variable "backups_enabled" {

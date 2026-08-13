@@ -1,11 +1,32 @@
-name: Configure Server
+name: Configure Server (deprecated)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DEPRECATED — no longer part of the normal deployment pipeline.
+#
+# Server configuration is now baked into the DigitalOcean snapshot by Packer
+# (see packer/) and completed at first boot by cloud-init (see
+# terraform/cloud-init.yml.tpl).  The two-step Terraform + Ansible flow has
+# been replaced by:
+#
+#   1. build-image.yml  — Packer builds a pre-configured snapshot
+#   2. provision.yml    — Terraform deploys the snapshot; cloud-init finishes
+#
+# This workflow is kept for:
+#   • Ad-hoc drift inspection against a running droplet
+#   • Emergency manual re-configuration if needed
+#   • Historical reference / rollback capability
+#
+# It will NOT run automatically.  Trigger manually via workflow_dispatch only.
+# ─────────────────────────────────────────────────────────────────────────────
 
 on:
-  workflow_dispatch: {}
-  workflow_run:
-    workflows: ["Provision Infrastructure"]
-    types: [completed]
-    branches: [main]
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "yes" to confirm running the deprecated Ansible configure workflow'
+        required: true
+        type: string
+        default: 'no'
 
 permissions:
   contents: read
@@ -15,27 +36,22 @@ env:
 
 jobs:
   configure:
-    name: Configure with Ansible
+    name: Configure with Ansible (manual / emergency only)
     runs-on: ubuntu-latest
-    
-    # Only run if Provision Infrastructure workflow succeeded, or on manual trigger
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      github.event_name == 'push' ||
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
-    
     environment: production
-    
+
+    if: github.event.inputs.confirm == 'yes'
+
     defaults:
       run:
         working-directory: ${{ env.ANSIBLE_WORKING_DIR }}
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
@@ -62,21 +78,14 @@ jobs:
         run: |
           DROPLET_IP=$(cd terraform && terraform output -raw droplet_ip)
           SSH_PORT="${{ secrets.SWARM_SSH_PORT || '1923' }}"
-          # Wait for either port 22 or the custom port to be reachable:
-          # - Fresh droplet: only port 22 is open (pre-bootstrap). Ansible
-          #   then runs bootstrap, which reboots and opens the custom port.
-          # - Existing droplet: port 22 is closed; custom port is open.
-          # Polling only the custom port would deadlock on fresh droplets
-          # because bootstrap (which opens it) hasn't run yet.
-          echo "Waiting for SSH on ${DROPLET_IP} (port 22 or ${SSH_PORT})..."
+          echo "Waiting for SSH on ${DROPLET_IP}:${SSH_PORT}..."
           for i in {1..60}; do
-            if nc -z -w 5 "${DROPLET_IP}" 22 2>/dev/null || \
-               nc -z -w 5 "${DROPLET_IP}" "${SSH_PORT}" 2>/dev/null; then
-              echo "SSH ready on ${DROPLET_IP}"
+            if nc -z -w 5 "${DROPLET_IP}" "${SSH_PORT}" 2>/dev/null; then
+              echo "SSH ready on ${DROPLET_IP}:${SSH_PORT}"
               sleep 5
               exit 0
             fi
-            echo "SSH not ready yet, retrying in 10 seconds... (attempt ${i}/60)"
+            echo "Not ready yet (attempt ${i}/60), retrying in 10s..."
             sleep 10
           done
           echo "SSH did not become available within the expected time."
@@ -89,24 +98,21 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           DROPLET_IP=$(cd terraform && terraform output -raw droplet_ip)
-          # Scan both port 22 (fresh droplet) and the custom port (existing droplet)
-          ssh-keyscan -p 22 -H "${DROPLET_IP}" >> ~/.ssh/known_hosts 2>/dev/null || true
-          ssh-keyscan -p ${{ secrets.SWARM_SSH_PORT || '1923' }} -H "${DROPLET_IP}" >> ~/.ssh/known_hosts 2>/dev/null || true
+          ssh-keyscan -p ${{ secrets.SWARM_SSH_PORT || '1923' }} -H "${DROPLET_IP}" \
+            >> ~/.ssh/known_hosts 2>/dev/null || true
 
       - name: Derive SSH public key from private key
         working-directory: .
         run: |
           ssh-keygen -y -f ~/.ssh/id_rsa > ~/.ssh/id_rsa.pub
-          # Write as a YAML block scalar — avoids any quoting issues with
-          # double-quoted strings if the key comment contains special chars.
           {
             echo "deployer_ssh_public_key: |"
             sed 's/^/  /' ~/.ssh/id_rsa.pub
           } > /tmp/bootstrap_vars.yml
 
-      - name: Run Ansible playbook (check mode)
+      - name: Run Ansible playbook
         run: |
-          ansible-playbook playbooks/site.yml --check --diff \
+          ansible-playbook playbooks/site.yml \
             --skip-tags bootstrap \
             -e "@group_vars/all.yml" \
             -e "ssh_port=${{ secrets.SWARM_SSH_PORT || '1923' }}" \
@@ -122,28 +128,3 @@ jobs:
           GRAFANA_CLOUD_METRICS_URL: ${{ secrets.GRAFANA_CLOUD_METRICS_URL }}
           GRAFANA_CLOUD_METRICS_ID: ${{ secrets.GRAFANA_CLOUD_METRICS_ID }}
           GRAFANA_CLOUD_API_KEY: ${{ secrets.GRAFANA_CLOUD_API_KEY }}
-        continue-on-error: true
-
-      - name: Run Ansible playbook
-        run: |
-          ansible-playbook playbooks/site.yml \
-            -e "@group_vars/all.yml" \
-            -e "ssh_port=${{ secrets.SWARM_SSH_PORT || '1923' }}" \
-            -e "@/tmp/bootstrap_vars.yml" \
-            -e "grafana_cloud_logs_url=${GRAFANA_CLOUD_LOGS_URL}" \
-            -e "grafana_cloud_logs_id=${GRAFANA_CLOUD_LOGS_ID}" \
-            -e "grafana_cloud_metrics_url=${GRAFANA_CLOUD_METRICS_URL}" \
-            -e "grafana_cloud_metrics_id=${GRAFANA_CLOUD_METRICS_ID}" \
-            -e "grafana_cloud_api_key=${GRAFANA_CLOUD_API_KEY}"
-        env:
-          GRAFANA_CLOUD_LOGS_URL: ${{ secrets.GRAFANA_CLOUD_LOGS_URL }}
-          GRAFANA_CLOUD_LOGS_ID: ${{ secrets.GRAFANA_CLOUD_LOGS_ID }}
-          GRAFANA_CLOUD_METRICS_URL: ${{ secrets.GRAFANA_CLOUD_METRICS_URL }}
-          GRAFANA_CLOUD_METRICS_ID: ${{ secrets.GRAFANA_CLOUD_METRICS_ID }}
-          GRAFANA_CLOUD_API_KEY: ${{ secrets.GRAFANA_CLOUD_API_KEY }}
-
-      - name: Verify services
-        run: |
-          ansible all -m shell -a "systemctl is-active docker"
-          ansible all -m shell -a "systemctl is-active alloy"
-          ansible all -m shell -a "docker info | grep 'Swarm: active'"

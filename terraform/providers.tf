@@ -10,6 +10,11 @@ terraform {
       source  = "cloudflare/cloudflare"
       version = "~> 4.0"
     }
+
+    cloudinit = {
+      source  = "hashicorp/cloudinit"
+      version = "~> 2.0"
+    }
   }
 
   # Terraform Cloud backend configuration
