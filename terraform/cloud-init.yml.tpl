@@ -7,18 +7,24 @@
 #   2. Docker Swarm init        (requires the real public IP at boot)
 #   3. Grafana Alloy config     (contains secrets — URLs, IDs, API key)
 
-# ── SSH key injection ─────────────────────────────────────────────────────────
-# Adds the deployer public key without touching root.  The image already has
-# the deployer user and sudo rule; this just populates authorized_keys.
-users:
-  - name: deployer
-    ssh_authorized_keys:
-      - ${deployer_ssh_public_key}
-
-# ── Runtime config files ──────────────────────────────────────────────────────
+# ── Runtime config files (incl. SSH key injection) ───────────────────────────
+# authorized_keys is written via write_files — more reliable than the users:
+# stanza when the deployer user is pre-created by the Packer image.
+# cloud-init's users: block silently skips ssh_authorized_keys for existing
+# users on Ubuntu 24.04, so we own the file directly here instead.
+#
+# NOTE: cloud-init allows only one write_files: key per document. SSH key
+# injection and runtime config files are therefore merged into this single block.
 write_files:
-  # Grafana Alloy config with real credentials — overwrites the placeholder
-  # written by the 04-monitoring.sh Packer script.
+  # ── SSH key for deployer user ─────────────────────────────────────────────
+  - path: /home/deployer/.ssh/authorized_keys
+    owner: deployer:deployer
+    permissions: "0600"
+    content: |
+      ${deployer_ssh_public_key}
+
+  # ── Grafana Alloy config ──────────────────────────────────────────────────
+  # Overwrites the placeholder written by the 04-monitoring.sh Packer script.
   - path: /etc/alloy/config.alloy
     owner: root:alloy
     permissions: "0640"

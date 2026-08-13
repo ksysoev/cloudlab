@@ -53,6 +53,12 @@ EOF
 chmod 0440 /etc/sudoers.d/deployer
 visudo -cf /etc/sudoers.d/deployer
 
+# Pre-create .ssh dir so cloud-init write_files can populate authorized_keys
+# reliably on first boot without needing to create the directory itself.
+mkdir -p /home/deployer/.ssh
+chmod 0700 /home/deployer/.ssh
+chown deployer:deployer /home/deployer/.ssh
+
 echo "==> [01-base] Creating cloudlab directory structure..."
 mkdir -p /opt/cloudlab/{scripts,stacks}
 chown -R deployer:deployer /opt/cloudlab
