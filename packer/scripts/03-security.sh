@@ -46,12 +46,17 @@ echo "==> [03-security] Enabling fail2ban..."
 systemctl enable fail2ban
 
 echo "==> [03-security] Hardening SSH..."
-# Remove DigitalOcean's cloud-init SSH default config if present — it opens
-# port 22 and may conflict with our custom_port.conf drop-in.
+# Remove the DO default sshd drop-in if present at build time.
+# Note: cloud-init may recreate it on first boot of the deployed droplet,
+# but 00-custom-port.conf sorts before 50-cloud-init.conf so our settings
+# (Port, PermitRootLogin, PasswordAuthentication) always take precedence.
 rm -f /etc/ssh/sshd_config.d/50-cloud-init.conf
 
-# Write SSH hardening and fail2ban config with the configured SSH port.
-cat > /etc/ssh/sshd_config.d/custom_port.conf <<EOF
+# Write SSH hardening config with the configured SSH port.
+# Named 00-custom-port.conf so it sorts FIRST among all drop-in files,
+# ensuring our settings (Port, PermitRootLogin) take priority over any
+# drop-in that cloud-init or other tools might add later.
+cat > /etc/ssh/sshd_config.d/00-custom-port.conf <<EOF
 Port ${SSH_PORT}
 PermitRootLogin no
 PasswordAuthentication no

@@ -78,8 +78,8 @@ build {
   # Ensure correct ownership/permissions on uploaded files
   provisioner "shell" {
     inline = [
-      "chown root:root /etc/docker/daemon.json /etc/fail2ban/jail.local /etc/ssh/sshd_config.d/custom_port.conf",
-      "chmod 0644 /etc/docker/daemon.json /etc/fail2ban/jail.local /etc/ssh/sshd_config.d/custom_port.conf",
+      "chown root:root /etc/docker/daemon.json /etc/fail2ban/jail.local /etc/ssh/sshd_config.d/00-custom-port.conf",
+      "chmod 0644 /etc/docker/daemon.json /etc/fail2ban/jail.local /etc/ssh/sshd_config.d/00-custom-port.conf",
       "mkdir -p /run/sshd",
       "chmod 0755 /run/sshd",
       "sshd -t",

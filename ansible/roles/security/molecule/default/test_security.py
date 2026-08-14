@@ -53,11 +53,14 @@ def test_fail2ban_jail_configuration(host):
 
 def test_ssh_hardening_config(host):
     """Test SSH hardening configuration."""
-    ssh_config = host.file("/etc/ssh/sshd_config.d/custom_port.conf")
+    ssh_config = host.file("/etc/ssh/sshd_config.d/00-custom-port.conf")
     assert ssh_config.exists, "SSH custom config should exist"
     assert ssh_config.contains("Port 1923"), "SSH should use custom port"
     assert ssh_config.contains("PermitRootLogin no"), "Root login should be disabled"
     assert ssh_config.contains("PasswordAuthentication no"), "Password auth should be disabled"
+
+    cloud_init_conf = host.file("/etc/ssh/sshd_config.d/50-cloud-init.conf")
+    assert not cloud_init_conf.exists, "50-cloud-init.conf should be removed to prevent cumulative Port 22"
 
 
 def test_ssh_service_running(host):
