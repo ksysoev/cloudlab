@@ -98,17 +98,59 @@ jobs:
           TF_OUTPUTS=$(terraform output -json)
           DROPLET_IP=$(echo "$TF_OUTPUTS" | jq -r '.droplet_ip.value')
           SSH_PORT=$(echo "$TF_OUTPUTS" | jq -r '.ssh_port.value')
-          echo "Waiting for SSH on ${DROPLET_IP}:${SSH_PORT} (cloud-init may still be running)..."
+          SSH_USER="deployer"
+          echo "Waiting for SSH on ${DROPLET_IP}:${SSH_PORT}..."
           for i in $(seq 1 30); do
             if nc -z -w 5 "${DROPLET_IP}" "${SSH_PORT}" 2>/dev/null; then
-              echo "SSH is reachable on ${DROPLET_IP}:${SSH_PORT}"
-              exit 0
+              echo "SSH port is open on ${DROPLET_IP}:${SSH_PORT}"
+              break
             fi
             echo "Attempt ${i}/30 — not ready yet, retrying in 15s..."
             sleep 15
+            if [ "$i" -eq 30 ]; then
+              echo "ERROR: SSH did not become reachable within 7.5 minutes."
+              exit 1
+            fi
           done
-          echo "WARNING: SSH did not become reachable within 7.5 minutes."
-          echo "cloud-init may still be running — check droplet console."
+          echo "Waiting for cloud-init to complete (docker swarm init runs inside cloud-init)..."
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOYER_SSH_PRIVATE_KEY }}" > ~/.ssh/ci_key
+          chmod 600 ~/.ssh/ci_key
+          for i in $(seq 1 40); do
+            STATUS=$(ssh -i ~/.ssh/ci_key \
+              -p "${SSH_PORT}" \
+              -o StrictHostKeyChecking=accept-new \
+              -o ConnectTimeout=10 \
+              "${SSH_USER}@${DROPLET_IP}" \
+              "cloud-init status 2>/dev/null || echo 'unknown'" 2>/dev/null || echo 'ssh-error')
+            echo "Attempt ${i}/40 — cloud-init status: ${STATUS}"
+            if echo "$STATUS" | grep -q 'done'; then
+              echo "cloud-init completed successfully."
+              # Verify swarm is active
+              SWARM=$(ssh -i ~/.ssh/ci_key \
+                -p "${SSH_PORT}" \
+                -o StrictHostKeyChecking=accept-new \
+                "${SSH_USER}@${DROPLET_IP}" \
+                "docker info --format '{{.Swarm.LocalNodeState}}' 2>/dev/null || echo unknown" 2>/dev/null || echo unknown)
+              if [ "$SWARM" = "active" ]; then
+                echo "Docker Swarm is active. Provisioning complete."
+                rm -f ~/.ssh/ci_key
+                exit 0
+              else
+                echo "ERROR: cloud-init done but Docker Swarm state is '${SWARM}' (expected 'active')."
+                echo "Check cloud-init logs: ssh to the droplet and run: sudo cat /var/log/cloud-init-output.log"
+                rm -f ~/.ssh/ci_key
+                exit 1
+              fi
+            elif echo "$STATUS" | grep -qE 'error|degraded'; then
+              echo "ERROR: cloud-init reported failure: ${STATUS}"
+              rm -f ~/.ssh/ci_key
+              exit 1
+            fi
+            sleep 15
+          done
+          echo "ERROR: cloud-init did not complete within 10 minutes."
+          rm -f ~/.ssh/ci_key
           exit 1
 
       - name: Terraform Destroy
