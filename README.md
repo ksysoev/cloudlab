@@ -7,7 +7,7 @@ Infrastructure as Code for provisioning Docker Swarm on DigitalOcean.
 CloudLab provides a complete infrastructure solution for running Docker Swarm on DigitalOcean with proper configuration management. It uses a two-layer approach:
 
 - **Terraform** for infrastructure provisioning (droplet, networking, SSH keys)
-- **Ansible** for OS and service configuration (Docker, monitoring, security)
+- **Packer** for OS and service configuration (Docker, monitoring, security)
 - **Docker Swarm** single-node cluster (easily scalable)
 - **Grafana Alloy** for logs and metrics collection
 - **Security hardening** with firewall, SSH configuration, and best practices
@@ -17,13 +17,13 @@ CloudLab provides a complete infrastructure solution for running Docker Swarm on
 
 - **Cost-effective:** ~$12/month for a production-ready swarm cluster
 - **Production-ready:** Hardened security configuration out of the box
-- **Infrastructure as Code:** Terraform for infrastructure, Ansible for configuration
+- **Infrastructure as Code:** Terraform for infrastructure, Packer for image configuration
 - **Stateful deployments:** Changes don't recreate the droplet (preserves data)
 - **Idempotent configuration:** Safe to run repeatedly, only changes what's needed
 - **Monitoring:** Built-in Grafana Alloy for observability
 - **Scalable:** Start with one node, scale to multi-node cluster
 - **Secure:** Non-standard SSH port, firewall rules, key authentication
-- **Fully automated:** GitHub Actions runs Terraform and Ansible on every push
+- **Fully automated:** GitHub Actions runs Terraform and Packer on every push
 
 ## Quick Start
 
@@ -126,11 +126,11 @@ Your infrastructure is now ready! Deploy workloads using `docker stack deploy` o
 │  Firewall: SSH (1923), HTTP (80), HTTPS (443), Custom (8081)  │
 └─────────────────────────────────────────────────────────────┘
                            │                    │
-                  Terraform │                    │ Ansible
-                  (infra)   │                    │ (config)
+                  Terraform │                    │ Packer
+                  (infra)   │                    │ (image build)
                            ▼                    ▼
               ┌────────────────────┐  ┌────────────────────┐
-              │   Provision        │  │   Configure        │
+              │   Provision        │  │   Bake Image       │
               │   - Droplet        │  │   - Docker         │
               │   - SSH Keys       │  │   - Security       │
               │   - Firewall       │  │   - Monitoring     │
@@ -149,12 +149,12 @@ Your infrastructure is now ready! Deploy workloads using `docker stack deploy` o
 - Manages SSH keys
 - **Result:** A bare Ubuntu server ready for configuration
 
-**Layer 2: Configuration (Ansible)**
+**Layer 2: Image Configuration (Packer)**
 - Installs and configures Docker + Swarm
 - Sets up security (UFW, fail2ban, SSH hardening)
 - Deploys Grafana Alloy monitoring
 - Creates directory structure
-- **Result:** A fully configured, production-ready server
+- **Result:** A pre-baked snapshot used by Terraform
 
 **Benefits:**
 - Changes to configuration don't recreate the droplet
@@ -176,21 +176,6 @@ cloudlab/
 │   ├── main.tf             # Main configuration
 │   ├── cloud-init.yaml     # Minimal bootstrap (Python + SSH)
 │   └── terraform.tfvars.example
-│
-├── ansible/                # Legacy Ansible artifacts (no longer on deploy path)
-│   ├── ansible.cfg         # Ansible configuration
-│   ├── inventory/
-│   │   └── production.py   # Dynamic inventory from Terraform
-│   ├── group_vars/
-│   │   └── all.yml         # Default variables
-│   ├── playbooks/
-│   │   └── site.yml        # Main playbook
-│   ├── roles/
-│   │   ├── common/         # Base system setup
-│   │   ├── security/       # Firewall, SSH hardening
-│   │   ├── docker/         # Docker + Swarm
-│   │   └── monitoring/     # Grafana Alloy
-│   └── README.md           # Ansible documentation
 │
 ├── .github/workflows/      # CI/CD automation
 │   ├── build-image.yml     # Packer image build + snapshot lifecycle

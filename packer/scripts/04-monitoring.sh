@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 # 04-monitoring.sh — Grafana Alloy installation
-# Translated from Ansible role: monitoring
 # Runs as root inside the Packer build droplet.
 #
 # Alloy config with Grafana Cloud secrets is NOT written here — it contains
