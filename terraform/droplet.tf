@@ -1,6 +1,6 @@
-# ─────────────────────────────────────────────────────────────────────────────
-# Grafana Alloy config — rendered with secrets, embedded in cloud-init
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
+# Grafana Alloy config - rendered with secrets, embedded in cloud-init
+# -----------------------------------------------------------------------------
 locals {
   alloy_config = templatefile("${path.module}/alloy-config.alloy.tpl", {
     swarm_instance_name       = var.droplet_name
@@ -18,20 +18,20 @@ locals {
   })
 }
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Main Swarm manager droplet — deployed from a Packer-built snapshot
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
+# Main Swarm manager droplet - deployed from a Packer-built snapshot
+# -----------------------------------------------------------------------------
 resource "digitalocean_droplet" "swarm_manager" {
   name   = var.droplet_name
   region = var.do_region
   size   = var.droplet_size
 
-  # Packer-built snapshot ID — contains pre-installed Docker, Alloy, UFW,
+  # Packer-built snapshot ID - contains pre-installed Docker, Alloy, UFW,
   # fail2ban, deployer user, and SSH hardening.
   # Changing this value triggers a droplet replacement (create_before_destroy).
   image = var.cloudlab_image_id
 
-  # Root SSH key — used only for emergency access; normal access is via
+  # Root SSH key - used only for emergency access; normal access is via
   # the deployer user whose key is injected by cloud-init (user_data below).
   ssh_keys = [digitalocean_ssh_key.cloudlab.id]
 
@@ -46,7 +46,7 @@ resource "digitalocean_droplet" "swarm_manager" {
   # Enable IPv6
   ipv6 = true
 
-  # cloud-init payload — injects SSH key, initialises Swarm, writes Alloy config
+  # cloud-init payload - injects SSH key, initialises Swarm, writes Alloy config
   user_data = sensitive(local.cloud_init_rendered)
 
   lifecycle {

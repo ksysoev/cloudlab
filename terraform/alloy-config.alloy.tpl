@@ -1,5 +1,5 @@
 // Grafana Alloy Configuration for ${swarm_instance_name}
-// Written by cloud-init at first boot — DO NOT EDIT MANUALLY.
+// Written by cloud-init at first boot - DO NOT EDIT MANUALLY.
 // Source: terraform/alloy-config.alloy.tpl
 
 logging {
@@ -7,7 +7,7 @@ logging {
   format = "logfmt"
 }
 
-// ── Alloy self-monitoring ────────────────────────────────────────────────────
+// -- Alloy self-monitoring ----------------------------------------------------
 
 prometheus.exporter.self "alloy_check" {}
 
@@ -46,7 +46,7 @@ prometheus.relabel "alloy_check" {
   }
 }
 
-// ── Metrics remote write ─────────────────────────────────────────────────────
+// -- Metrics remote write -----------------------------------------------------
 %{ if grafana_cloud_metrics_url != "" }
 prometheus.remote_write "metrics_service" {
   endpoint {
@@ -59,7 +59,7 @@ prometheus.remote_write "metrics_service" {
   }
 }
 %{ else }
-// Grafana Cloud metrics not configured — using a no-op remote_write.
+// Grafana Cloud metrics not configured - using a no-op remote_write.
 // Replace by setting grafana_cloud_metrics_url in Terraform variables.
 prometheus.remote_write "metrics_service" {
   endpoint {
@@ -68,7 +68,7 @@ prometheus.remote_write "metrics_service" {
 }
 %{ endif }
 
-// ── Logs remote write ────────────────────────────────────────────────────────
+// -- Logs remote write --------------------------------------------------------
 %{ if grafana_cloud_logs_url != "" }
 loki.write "grafana_cloud_loki" {
   endpoint {
@@ -81,7 +81,7 @@ loki.write "grafana_cloud_loki" {
   }
 }
 %{ else }
-// Grafana Cloud logs not configured — falling back to local Loki (if running).
+// Grafana Cloud logs not configured - falling back to local Loki (if running).
 loki.write "grafana_cloud_loki" {
   endpoint {
     url = "http://localhost:3100/loki/api/v1/push"
@@ -89,8 +89,7 @@ loki.write "grafana_cloud_loki" {
 }
 %{ endif }
 
-// ── Node exporter (host metrics) ─────────────────────────────────────────────
-
+// -- Node exporter (host metrics) ---------------------------------------------
 prometheus.exporter.unix "integrations_node_exporter" {
   disable_collectors = ["ipvs", "btrfs", "infiniband", "xfs", "zfs"]
 
@@ -140,8 +139,7 @@ prometheus.relabel "integrations_node_exporter" {
 }
 %{ endif }
 
-// ── Journal logs ─────────────────────────────────────────────────────────────
-
+// -- Journal logs -------------------------------------------------------------
 loki.source.journal "node_exporter_journal" {
   max_age       = "24h0m0s"
   relabel_rules = discovery.relabel.node_exporter_journal.rules
@@ -186,8 +184,7 @@ loki.source.file "node_exporter_direct" {
   forward_to = [loki.write.grafana_cloud_loki.receiver]
 }
 
-// ── Docker cAdvisor (container metrics) ──────────────────────────────────────
-
+// -- Docker cAdvisor (container metrics) --------------------------------------
 prometheus.exporter.cadvisor "integrations_cadvisor" {
   docker_only = true
 }
@@ -223,8 +220,7 @@ prometheus.scrape "integrations_cadvisor" {
 }
 %{ endif }
 
-// ── Docker container logs ─────────────────────────────────────────────────────
-
+// -- Docker container logs -----------------------------------------------------
 discovery.docker "logs_docker" {
   host             = "unix:///var/run/docker.sock"
   refresh_interval = "5s"
