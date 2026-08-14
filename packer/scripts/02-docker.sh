@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 # 02-docker.sh — Docker CE installation
-# Translated from Ansible role: docker
 # Runs as root inside the Packer build droplet.
 #
 # NOTE: Docker Swarm init and overlay network creation are intentionally
