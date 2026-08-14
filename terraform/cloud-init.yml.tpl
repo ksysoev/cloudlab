@@ -62,7 +62,7 @@ runcmd:
     set -euo pipefail
     for i in $(seq 1 30); do
       if docker info > /dev/null 2>&1; then
-        echo "Docker socket ready after ${i}s"
+        echo "Docker socket ready after $${i}s"
         break
       fi
       if [ "$i" -eq 30 ]; then
