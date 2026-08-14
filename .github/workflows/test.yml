@@ -7,6 +7,7 @@ on:
     paths:
       - 'terraform/**'
       - '.github/workflows/test.yml'
+      - 'packer/**'
 
 permissions:
   contents: read
@@ -17,7 +18,40 @@ env:
   TF_CLOUD_ORGANIZATION: ${{ secrets.TF_CLOUD_ORG }}
 
 jobs:
+  template-ascii-check:
+    name: Template ASCII Safety Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Check for non-ASCII bytes in cloud-init and Alloy templates
+        run: |
+          python3 - << 'EOF'
+          import sys, glob
+          bad_files = []
+          patterns = ['terraform/*.tpl', 'packer/scripts/*.sh', 'packer/files/*']
+          for pattern in patterns:
+              for path in glob.glob(pattern):
+                  with open(path, 'rb') as f:
+                      data = f.read()
+                  positions = [i for i, b in enumerate(data) if b > 127]
+                  if positions:
+                      bad_files.append((path, positions[:3]))
+          if bad_files:
+              print('ERROR: Non-ASCII bytes found in template/script files.')
+              print('These will cause cloud-init YAML parse failures on the droplet.')
+              print('Replace Unicode decorators (em dashes, box-drawing chars, etc.) with ASCII.')
+              print()
+              for path, positions in bad_files:
+                  print(f'  {path}: non-ASCII at byte positions {positions}')
+              sys.exit(1)
+          else:
+              print('All template and script files are ASCII-safe.')
+          EOF
+
   terraform-validate:
+    needs: template-ascii-check
     name: Terraform Validation
     runs-on: ubuntu-latest
     

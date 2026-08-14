@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# 04-monitoring.sh — Grafana Alloy installation
+# 04-monitoring.sh - Grafana Alloy installation
 # Runs as root inside the Packer build droplet.
 #
-# Alloy config with Grafana Cloud secrets is NOT written here — it contains
+# Alloy config with Grafana Cloud secrets is NOT written here - it contains
 # sensitive credentials that vary per environment. cloud-init writes the
 # real config.alloy at first boot (see terraform/cloud-init.yml.tpl).
 set -euo pipefail
@@ -52,7 +52,7 @@ mkdir -p /etc/alloy
 # Placeholder config so the service can be enabled without failing syntax checks.
 # cloud-init overwrites this with the real secret-bearing config at first boot.
 cat > /etc/alloy/config.alloy <<'EOF'
-// Placeholder — replaced by cloud-init at first boot with Grafana Cloud credentials.
+// Placeholder - replaced by cloud-init at first boot with Grafana Cloud credentials.
 logging {
   level  = "info"
   format = "logfmt"
