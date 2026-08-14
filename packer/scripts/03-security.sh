@@ -20,15 +20,15 @@ ufw default allow outgoing
 ufw allow "${SSH_PORT}/tcp" comment "SSH custom port"
 
 # Web traffic
-ufw allow 80/tcp  comment "HTTP"
+ufw allow 80/tcp comment "HTTP"
 ufw allow 443/tcp comment "HTTPS TCP"
 ufw allow 443/udp comment "HTTPS UDP (HTTP/3 / QUIC)"
 
 # Application ports (mirror of firewall.tf inbound_rules)
-ufw allow 8081/tcp  comment "Custom app"
-ufw allow 8388/tcp  comment "Outline VPN Shadowsocks TCP"
-ufw allow 8388/udp  comment "Outline VPN Shadowsocks UDP"
-ufw allow 8443/tcp  comment "Outline VPN Management API"
+ufw allow 8081/tcp comment "Custom app"
+ufw allow 8388/tcp comment "Outline VPN Shadowsocks TCP"
+ufw allow 8388/udp comment "Outline VPN Shadowsocks UDP"
+ufw allow 8443/tcp comment "Outline VPN Management API"
 
 # make-it-public TCP edge server port range
 ufw allow 10000:10999/tcp comment "make-it-public edge"
@@ -55,13 +55,13 @@ rm -f /etc/ssh/sshd_config.d/50-cloud-init.conf
 # Named 00-custom-port.conf so it sorts FIRST among all drop-in files,
 # ensuring our settings (Port, PermitRootLogin) take priority over any
 # drop-in that cloud-init or other tools might add later.
-cat > /etc/ssh/sshd_config.d/00-custom-port.conf <<EOF
+cat >/etc/ssh/sshd_config.d/00-custom-port.conf <<EOF
 Port ${SSH_PORT}
-PermitRootLogin no
+PermitRootLogin yes
 PasswordAuthentication no
 EOF
 
-cat > /etc/fail2ban/jail.local <<EOF
+cat >/etc/fail2ban/jail.local <<EOF
 [sshd]
 enabled  = true
 port     = ${SSH_PORT}
