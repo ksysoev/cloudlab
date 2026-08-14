@@ -119,7 +119,7 @@ jobs:
           for i in $(seq 1 40); do
             STATUS=$(ssh -i ~/.ssh/ci_key \
               -p "${SSH_PORT}" \
-              -o StrictHostKeyChecking=no \
+              -o StrictHostKeyChecking=accept-new \
               -o ConnectTimeout=10 \
               "${SSH_USER}@${DROPLET_IP}" \
               "cloud-init status 2>/dev/null || echo 'unknown'" 2>/dev/null || echo 'ssh-error')
@@ -129,7 +129,7 @@ jobs:
               # Verify swarm is active
               SWARM=$(ssh -i ~/.ssh/ci_key \
                 -p "${SSH_PORT}" \
-                -o StrictHostKeyChecking=no \
+                -o StrictHostKeyChecking=accept-new \
                 "${SSH_USER}@${DROPLET_IP}" \
                 "docker info --format '{{.Swarm.LocalNodeState}}' 2>/dev/null || echo unknown" 2>/dev/null || echo unknown)
               if [ "$SWARM" = "active" ]; then

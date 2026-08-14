@@ -125,7 +125,7 @@ jobs:
           
           # Validate that the sanitized service name is not empty
           if [ -z "$SERVICE_NAME" ]; then
-            echo "Error: Service name is empty after sanitization. Use only letters (a-z) and digits (0-9) in the repository or service_name input."
+            echo "Error: Service name is empty after sanitization. Use only letters (a-z), digits (0-9), and hyphens (-) in the repository or service_name input."
             exit 1
           fi
           
