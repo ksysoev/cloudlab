@@ -53,7 +53,7 @@ def test_fail2ban_jail_configuration(host):
 
 def test_ssh_hardening_config(host):
     """Test SSH hardening configuration."""
-    ssh_config = host.file("/etc/ssh/sshd_config.d/custom_port.conf")
+    ssh_config = host.file("/etc/ssh/sshd_config.d/00-custom-port.conf")
     assert ssh_config.exists, "SSH custom config should exist"
     assert ssh_config.contains("Port 1923"), "SSH should use custom port"
     assert ssh_config.contains("PermitRootLogin no"), "Root login should be disabled"

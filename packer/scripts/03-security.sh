@@ -46,12 +46,28 @@ echo "==> [03-security] Enabling fail2ban..."
 systemctl enable fail2ban
 
 echo "==> [03-security] Hardening SSH..."
-# Remove DigitalOcean's cloud-init SSH default config if present — it opens
-# port 22 and may conflict with our custom_port.conf drop-in.
+# Disable cloud-init's SSH module so it never creates or modifies
+# /etc/ssh/sshd_config.d/50-cloud-init.conf on first boot.
+# Without this, cloud-init clean --logs (in 99-cleanup.sh) causes cloud-init
+# to re-run cc_ssh on every deployed droplet, recreating 50-cloud-init.conf
+# which sorts BEFORE custom_port.conf and can override our PermitRootLogin/Port.
+mkdir -p /etc/cloud/cloud.cfg.d
+cat > /etc/cloud/cloud.cfg.d/99-disable-ssh-module.cfg <<'EOF'
+# Disable the ssh module — sshd is fully configured by
+# /etc/ssh/sshd_config.d/custom_port.conf baked into the Packer image.
+ssh_deletekeys: false
+ssh_genkeytypes: []
+no_ssh_fingerprints: true
+EOF
+
+# Remove the DO default config now (belt-and-suspenders: also blocked above).
 rm -f /etc/ssh/sshd_config.d/50-cloud-init.conf
 
-# Write SSH hardening and fail2ban config with the configured SSH port.
-cat > /etc/ssh/sshd_config.d/custom_port.conf <<EOF
+# Write SSH hardening config with the configured SSH port.
+# Named 00-custom-port.conf so it sorts FIRST among all drop-in files,
+# ensuring our settings (Port, PermitRootLogin) take priority over any
+# drop-in that cloud-init or other tools might add later.
+cat > /etc/ssh/sshd_config.d/00-custom-port.conf <<EOF
 Port ${SSH_PORT}
 PermitRootLogin no
 PasswordAuthentication no

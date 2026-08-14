@@ -70,7 +70,7 @@
 - name: Create SSH hardening configuration
   ansible.builtin.template:
     src: sshd_custom.conf.j2
-    dest: /etc/ssh/sshd_config.d/custom_port.conf
+    dest: /etc/ssh/sshd_config.d/00-custom-port.conf
     owner: root
     group: root
     mode: '0644'

@@ -77,7 +77,7 @@
 
 # Port 22 is intentionally kept open alongside the custom port so Ansible
 # can reconnect after the reboot below. The security role removes
-# bootstrap.conf and writes custom_port.conf (custom port only), closing
+# bootstrap.conf and writes 00-custom-port.conf (custom port only), closing
 # port 22 once deployer access on the custom port is confirmed.
 - name: Reboot to apply updates and activate SSH configuration
   ansible.builtin.reboot:
