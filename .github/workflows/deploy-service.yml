@@ -118,9 +118,9 @@ jobs:
           if [ -z "${{ inputs.service_name }}" ]; then
             # Extract repo name and sanitize (remove special chars, lowercase)
             REPO_NAME="${GITHUB_REPOSITORY##*/}"
-            SERVICE_NAME=$(echo "$REPO_NAME" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]-' | tr -d '-')
+            SERVICE_NAME=$(echo "$REPO_NAME" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]-')
           else
-            SERVICE_NAME=$(echo "${{ inputs.service_name }}" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]-' | tr -d '-')
+            SERVICE_NAME=$(echo "${{ inputs.service_name }}" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]-')
           fi
           
           # Validate that the sanitized service name is not empty
@@ -360,6 +360,27 @@ jobs:
               "rm -f '$REMOTE_SCRIPT'" || true
 
           exit $SSH_EXIT
+
+      - name: Verify Docker Swarm is active
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+              -p ${{ steps.validate.outputs.ssh_port }} \
+              -o StrictHostKeyChecking=accept-new \
+              ${{ steps.validate.outputs.ssh_user }}@${{ steps.validate.outputs.ssh_host }} \
+              bash -euo pipefail << 'EOF'
+            SWARM_STATE=$(docker info --format '{{.Swarm.LocalNodeState}}' 2>/dev/null || echo inactive)
+            if [ "$SWARM_STATE" != "active" ]; then
+              echo "ERROR: This node is not a Docker Swarm manager (state: ${SWARM_STATE})."
+              echo "cloud-init may have failed to run 'docker swarm init' at first boot."
+              echo "To diagnose, SSH to the server and check:"
+              echo "  sudo cat /var/log/cloud-init-output.log | grep -A5 'swarm\|ERROR'"
+              echo "To fix manually:"
+              echo "  PUBLIC_IP=\$(curl -sf http://169.254.169.254/metadata/v1/interfaces/public/0/ipv4/address)"
+              echo "  docker swarm init --advertise-addr \$PUBLIC_IP"
+              exit 1
+            fi
+            echo "Docker Swarm is active. Proceeding with deployment."
+          EOF
 
       - name: Deploy to Docker Swarm
         id: deploy
