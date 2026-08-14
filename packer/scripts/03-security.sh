@@ -57,7 +57,7 @@ rm -f /etc/ssh/sshd_config.d/50-cloud-init.conf
 # drop-in that cloud-init or other tools might add later.
 cat >/etc/ssh/sshd_config.d/00-custom-port.conf <<EOF
 Port ${SSH_PORT}
-PermitRootLogin yes
+PermitRootLogin no
 PasswordAuthentication no
 EOF
 

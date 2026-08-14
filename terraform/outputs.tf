@@ -35,7 +35,7 @@ output "deployer_connection_string" {
 }
 
 output "root_connection_string" {
-  description = "SSH connection string for root user (DEPRECATED: root login is disabled for security)"
+  description = "SSH connection string for root user (disabled - root login is not permitted)"
   value       = "ssh -p ${var.ssh_port} root@${digitalocean_droplet.swarm_manager.ipv4_address}"
   sensitive   = true
 }
