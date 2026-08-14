@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 99-cleanup.sh — Reset machine-specific state before snapshotting
+# 99-cleanup.sh - Reset machine-specific state before snapshotting
 # Ensures each droplet deployed from this image boots as a clean instance.
 set -euo pipefail
 

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# 02-docker.sh — Docker CE installation
+# 02-docker.sh - Docker CE installation
 # Runs as root inside the Packer build droplet.
 #
 # NOTE: Docker Swarm init and overlay network creation are intentionally
-# NOT done here — they require the real public IP which is only known at
+# NOT done here - they require the real public IP which is only known at
 # deploy time. cloud-init handles both (see terraform/cloud-init.yml.tpl).
 set -euo pipefail
 

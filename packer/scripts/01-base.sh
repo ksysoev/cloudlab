@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 01-base.sh — Base system setup
+# 01-base.sh - Base system setup
 # Runs as root inside the Packer build droplet.
 set -euo pipefail
 

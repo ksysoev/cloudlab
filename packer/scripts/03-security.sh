@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 03-security.sh — UFW firewall, fail2ban, SSH hardening
+# 03-security.sh - UFW firewall, fail2ban, SSH hardening
 # Runs as root inside the Packer build droplet.
 #
 # SSH_PORT is passed as an environment variable from the Packer template
