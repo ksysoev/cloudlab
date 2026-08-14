@@ -3,7 +3,6 @@ name: Provision Infrastructure
 # Provisions or updates DigitalOcean infrastructure via Terraform.
 # The droplet is deployed from a pre-baked Packer snapshot (cloudlab_image_id).
 # All server configuration is handled by cloud-init at first boot — no
-# separate Ansible configure step is required.
 #
 # Trigger order for a full image update:
 #   1. build-image.yml  — builds new Packer snapshot, updates cloudlab_image_id
