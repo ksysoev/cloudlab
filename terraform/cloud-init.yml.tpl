@@ -73,6 +73,13 @@ runcmd:
   - systemctl start alloy
   - systemctl is-active --quiet alloy || echo "WARNING: Alloy failed to start, check /etc/alloy/config.alloy"
 
+  # Remove cloud-init's sshd drop-in if cc_ssh recreated it during this boot.
+  # Port directives are cumulative in sshd_config — leaving 50-cloud-init.conf
+  # in place risks sshd listening on port 22 in addition to our custom port.
+  # 00-custom-port.conf (baked by Packer) is the sole authoritative sshd config.
+  - rm -f /etc/ssh/sshd_config.d/50-cloud-init.conf
+  - systemctl restart ssh
+
 final_message: |
   CloudLab droplet is ready.
   Deployer SSH key injected, Docker Swarm initialised, Grafana Alloy running.

@@ -59,6 +59,9 @@ def test_ssh_hardening_config(host):
     assert ssh_config.contains("PermitRootLogin no"), "Root login should be disabled"
     assert ssh_config.contains("PasswordAuthentication no"), "Password auth should be disabled"
 
+    cloud_init_conf = host.file("/etc/ssh/sshd_config.d/50-cloud-init.conf")
+    assert not cloud_init_conf.exists, "50-cloud-init.conf should be removed to prevent cumulative Port 22"
+
 
 def test_ssh_service_running(host):
     """Test that SSH service is running."""

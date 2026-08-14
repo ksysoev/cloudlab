@@ -67,6 +67,12 @@
     path: /etc/ssh/sshd_config.d/bootstrap.conf
     state: absent
 
+- name: Remove cloud-init sshd drop-in
+  ansible.builtin.file:
+    path: /etc/ssh/sshd_config.d/50-cloud-init.conf
+    state: absent
+  notify: Restart ssh
+
 - name: Create SSH hardening configuration
   ansible.builtin.template:
     src: sshd_custom.conf.j2
