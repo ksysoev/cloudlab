@@ -38,10 +38,10 @@ jobs:
           if [ -z "$SSH_USER" ]; then SSH_USER="deployer"; fi
 
           # Derive the Swarm stack name using the same sanitisation logic as
-          # deploy-service.yml (lowercase, strip non-alnum, strip hyphens).
+          # deploy-service.yml (lowercase, strip non-alnum; hyphens are kept).
           # This must stay in sync with service_name: in the deploy job below.
           SERVICE_RAW="outline-vpn"
-          STACK_NAME=$(echo "$SERVICE_RAW" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]-' | tr -d '-')
+          STACK_NAME=$(echo "$SERVICE_RAW" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]-')
 
           ssh -i ~/.ssh/deploy_key \
               -p "$SSH_PORT" \
