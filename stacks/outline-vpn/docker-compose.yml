@@ -44,7 +44,11 @@ services:
       restart_policy:
         condition: any
         delay: 5s
-        max_attempts: 3
+        # max_attempts is intentionally omitted (unlimited retries).
+        # The workflow's health_check_timeout: 90 acts as the upper bound
+        # for how long we wait. Setting max_attempts would permanently
+        # exhaust retries and cause docker stack deploy to skip new tasks
+        # when the spec is unchanged.
 
 # Image updates are handled by the deploy-outline.yml GitHub Actions workflow,
 # which runs `docker stack deploy --resolve-image always` and always re-pulls
