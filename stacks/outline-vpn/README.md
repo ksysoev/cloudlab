@@ -118,5 +118,4 @@ Paste the printed `ss://` URL into the Outline client to connect.
 |-------------------|--------------------------------------------------------------------|
 | VPN port          | `8388` (TCP + UDP)                                                 |
 | Management port   | `8443` (internal only — not exposed externally)                    |
-| Server IP         | `159.223.92.34`                                                    |
-| Cert SHA256       | `9CC8492FA454507B69CBC7BE244275C277D3FCE7A7D20317215D1699F50052D1` |
+
