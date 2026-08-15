@@ -102,13 +102,55 @@ jobs:
       ssh_port: ${{ secrets.SWARM_SSH_PORT }}
       deployment_secrets: ${{ secrets.OUTLINE_DEPLOYMENT_SECRETS }}
 
+  # Force-restart the Shadowbox service after every deploy so that Swarm
+  # always starts a fresh task — even when the image digest and spec are
+  # unchanged (e.g. repeated deploys to fix config). Without this, if the
+  # previous run exhausted restart attempts the service stays shut down.
+  force-restart:
+    needs: deploy
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Prepare SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SWARM_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          SSH_PORT="${{ secrets.SWARM_SSH_PORT }}"
+          if [ -z "$SSH_PORT" ]; then SSH_PORT="1923"; fi
+          ssh-keyscan -p "$SSH_PORT" -H make-it-public.dev \
+            >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Force-update Shadowbox service
+        run: |
+          SSH_PORT="${{ secrets.SWARM_SSH_PORT }}"
+          if [ -z "$SSH_PORT" ]; then SSH_PORT="1923"; fi
+          SSH_USER="${{ secrets.SWARM_USER }}"
+          if [ -z "$SSH_USER" ]; then SSH_USER="deployer"; fi
+
+          ssh -i ~/.ssh/deploy_key \
+              -p "$SSH_PORT" \
+              -o StrictHostKeyChecking=accept-new \
+              "${SSH_USER}@make-it-public.dev" bash << 'EOF'
+            set -euo pipefail
+            SERVICE="outline-vpn_shadowbox"
+            echo "Force-updating $SERVICE to ensure a fresh task is scheduled..."
+            docker service update --force "$SERVICE"
+            echo "Done."
+          EOF
+
+      - name: Cleanup SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
   # Ensure the Shadowbox server generates access keys on port 8388, which is
   # the port published in docker-compose.yml and open in the firewall.
   # The server picks a random portForNewAccessKeys on first boot (persisted in
   # the outline-state volume); this job corrects it to 8388 after every deploy.
   # Idempotent: skips the API call when the port is already correct.
   configure-server:
-    needs: deploy
+    needs: force-restart
     runs-on: ubuntu-latest
     environment: production
     steps:
@@ -135,7 +177,7 @@ jobs:
               -o StrictHostKeyChecking=accept-new \
               "${SSH_USER}@make-it-public.dev" bash << 'EOF'
             set -euo pipefail
-            CONTAINER=$(docker ps -q --filter name=outlinevpn_shadowbox)
+            CONTAINER=$(docker ps -q --filter name=outline-vpn_shadowbox)
             PREFIX=$(docker inspect "$CONTAINER" \
               --format '{{range .Config.Env}}{{println .}}{{end}}' \
               | grep SB_API_PREFIX | cut -d= -f2)
