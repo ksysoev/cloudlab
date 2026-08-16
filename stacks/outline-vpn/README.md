@@ -13,19 +13,27 @@ ssh -p 1923 deployer@make-it-public.dev
 
 ## Helper variables
 
-Run these once per session to avoid repetition:
+Run these once per session to avoid repetition.
+The container name changed when the stack was renamed — make sure to use the
+current filter `outline-vpn_shadowbox`:
 
 ```bash
-CONTAINER=$(docker ps -q --filter name=outlinevpn_shadowbox)
-PREFIX=$(docker inspect $CONTAINER \
+CONTAINER=$(docker ps -q --filter name=outline-vpn_shadowbox)
+PREFIX=$(docker inspect "$CONTAINER" \
   --format '{{range .Config.Env}}{{println .}}{{end}}' \
   | grep SB_API_PREFIX | cut -d= -f2)
+
+# Verify both are set before proceeding
+echo "CONTAINER=$CONTAINER  PREFIX=$PREFIX"
 ```
+
+> **Tip:** if `CONTAINER` or `PREFIX` is empty, Shadowbox is not running.
+> Check with `docker ps` and look for a container named `outline-vpn_shadowbox.*`.
 
 ## List existing keys
 
 ```bash
-docker exec $CONTAINER \
+docker exec "$CONTAINER" \
   curl -sk "https://localhost:8443/$PREFIX/access-keys" \
   | python3 -m json.tool
 ```
@@ -33,7 +41,7 @@ docker exec $CONTAINER \
 ## Create a new key
 
 ```bash
-docker exec $CONTAINER \
+docker exec "$CONTAINER" \
   curl -sk -X POST "https://localhost:8443/$PREFIX/access-keys" \
   | python3 -m json.tool
 ```
@@ -46,7 +54,7 @@ the Outline client app (iOS, Android, macOS, Windows, Linux).
 Replace `<id>` with the numeric key id returned when listing or creating keys:
 
 ```bash
-docker exec $CONTAINER \
+docker exec "$CONTAINER" \
   curl -sk -X PUT "https://localhost:8443/$PREFIX/access-keys/<id>/name" \
   -H 'Content-Type: application/json' \
   -d '{"name":"alice-phone"}'
@@ -55,7 +63,7 @@ docker exec $CONTAINER \
 ## Delete a key
 
 ```bash
-docker exec $CONTAINER \
+docker exec "$CONTAINER" \
   curl -sk -X DELETE "https://localhost:8443/$PREFIX/access-keys/<id>"
 ```
 
@@ -64,7 +72,7 @@ docker exec $CONTAINER \
 Limit is specified in bytes (e.g. `10737418240` = 10 GB):
 
 ```bash
-docker exec $CONTAINER \
+docker exec "$CONTAINER" \
   curl -sk -X PUT "https://localhost:8443/$PREFIX/access-keys/<id>/data-limit" \
   -H 'Content-Type: application/json' \
   -d '{"limit":{"bytes":10737418240}}'
@@ -73,21 +81,23 @@ docker exec $CONTAINER \
 ## Remove a data limit from a key
 
 ```bash
-docker exec $CONTAINER \
+docker exec "$CONTAINER" \
   curl -sk -X DELETE "https://localhost:8443/$PREFIX/access-keys/<id>/data-limit"
 ```
 
 ## Full example — create and share a key in one command
 
-Run this from your local machine:
+Run this from your local machine (or directly on the server):
 
 ```bash
 ssh -p 1923 deployer@make-it-public.dev bash << 'EOF'
-CONTAINER=$(docker ps -q --filter name=outlinevpn_shadowbox)
-PREFIX=$(docker inspect $CONTAINER \
+CONTAINER=$(docker ps -q --filter name=outline-vpn_shadowbox)
+if [ -z "$CONTAINER" ]; then echo "ERROR: shadowbox container not running"; exit 1; fi
+PREFIX=$(docker inspect "$CONTAINER" \
   --format '{{range .Config.Env}}{{println .}}{{end}}' \
   | grep SB_API_PREFIX | cut -d= -f2)
-docker exec $CONTAINER \
+if [ -z "$PREFIX" ]; then echo "ERROR: SB_API_PREFIX not set in container env"; exit 1; fi
+docker exec "$CONTAINER" \
   curl -sk -X POST "https://localhost:8443/$PREFIX/access-keys" \
   | python3 -c "import sys,json; k=json.load(sys.stdin); print('Key id:', k['id']); print('Access URL:', k['accessUrl'])"
 EOF
@@ -108,5 +118,4 @@ Paste the printed `ss://` URL into the Outline client to connect.
 |-------------------|--------------------------------------------------------------------|
 | VPN port          | `8388` (TCP + UDP)                                                 |
 | Management port   | `8443` (internal only — not exposed externally)                    |
-| Server IP         | `167.99.242.157`                                                   |
-| Cert SHA256       | `01704BC36AEDF7594A19170B88634C6D1645A3DD4B19F03D39ECE2ADAEC790C6` |
+
